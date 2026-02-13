@@ -164,3 +164,158 @@ SWITCH_ADDR_010:
     - "Verify switch does not learn this address"
   expected_result:
     no_learning: true
+
+SWITCH_ADDR_011:
+  tc8_reference: "5.5.11"
+  title: "Per-VLAN MAC Learning (IVL)"
+  description: "Verify MAC address learning is independent per VLAN (Independent VLAN Learning)"
+  priority: high
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Learn MAC-X on Port A in VLAN 10"
+    - "Send frame to MAC-X in VLAN 20 from Port B"
+    - "Verify frame is flooded in VLAN 20 (separate learning context)"
+  expected_result:
+    forward_to: "member_ports_only"
+    per_vlan_learning: true
+
+SWITCH_ADDR_012:
+  tc8_reference: "5.5.12"
+  title: "MAC Learning Rate"
+  description: "Verify switch can learn new MAC addresses at the expected rate"
+  priority: medium
+  parameters:
+    mac_count: 100
+    rate_pps: 1000
+  test_procedure:
+    - "Send frames with unique source MACs at specified rate"
+    - "Verify all MACs are learned without loss"
+  expected_result:
+    all_macs_learned: true
+
+SWITCH_ADDR_013:
+  tc8_reference: "5.5.13"
+  title: "Per-VLAN Aging Timer"
+  description: "Verify MAC aging operates independently for each VLAN"
+  priority: medium
+  timing_tier: tier_b
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Learn MAC in VLAN 10 and VLAN 20"
+    - "Refresh MAC in VLAN 10 only"
+    - "Wait for aging timeout"
+    - "Verify VLAN 20 entry aged, VLAN 10 entry retained"
+  expected_result:
+    per_vlan_aging: true
+
+SWITCH_ADDR_014:
+  tc8_reference: "5.5.14"
+  title: "Rapid MAC Move Detection"
+  description: "Verify switch detects and handles rapid MAC address moves between ports"
+  priority: medium
+  parameters:
+    move_count: 10
+    interval_ms: 100
+  test_procedure:
+    - "Learn MAC on Port A"
+    - "Rapidly send frames with same source MAC from Port B"
+    - "Verify MAC entry updates to Port B"
+  expected_result:
+    port_migration: true
+
+SWITCH_ADDR_015:
+  tc8_reference: "5.5.15"
+  title: "MAC Table Overflow Behavior"
+  description: "Verify switch behavior when MAC table is full and new MAC is received"
+  priority: medium
+  parameters:
+    mac_count_range: [1, 4096]
+  test_procedure:
+    - "Fill MAC table to capacity"
+    - "Send frame with new source MAC"
+    - "Verify either oldest entry replaced or new frame flooded"
+  expected_result:
+    behavior: "implementation_defined"
+
+SWITCH_ADDR_016:
+  tc8_reference: "5.5.16"
+  title: "Static vs. Dynamic Entry Priority"
+  description: "Verify static MAC entries cannot be overwritten by dynamically learned entries"
+  priority: medium
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Configure static MAC entry for Port A"
+    - "Send frame with same source MAC on Port B"
+    - "Verify static entry unchanged — traffic still goes to Port A"
+  expected_result:
+    static_priority: true
+
+SWITCH_ADDR_017:
+  tc8_reference: "5.5.17"
+  title: "MAC Flush on Link Down"
+  description: "Verify learned MAC entries for a port are flushed when link goes down"
+  priority: medium
+  test_procedure:
+    - "Learn MACs on Port A"
+    - "Disconnect Port A (link down)"
+    - "Send frame to learned MAC — verify flooding (entry flushed)"
+  expected_result:
+    entries_flushed: true
+
+SWITCH_ADDR_018:
+  tc8_reference: "5.5.18"
+  title: "MAC Flush on Topology Change"
+  description: "Verify MAC table flushed on spanning tree topology change notification"
+  priority: low
+  test_procedure:
+    - "Learn MACs across multiple ports"
+    - "Trigger topology change"
+    - "Verify MAC table cleared"
+  expected_result:
+    entries_flushed: true
+
+SWITCH_ADDR_019:
+  tc8_reference: "5.5.19"
+  title: "Learning Disabled on Port"
+  description: "Verify MAC learning can be disabled on specific ports"
+  priority: low
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "Learning disabled on test port"
+  test_procedure:
+    - "Send frame with new source MAC on learning-disabled port"
+    - "Verify MAC is NOT added to table"
+  expected_result:
+    no_learning: true
+
+SWITCH_ADDR_020:
+  tc8_reference: "5.5.20"
+  title: "Multiple MACs Per Port"
+  description: "Verify switch correctly handles multiple MAC addresses learned on the same port"
+  priority: medium
+  parameters:
+    mac_count: 10
+  test_procedure:
+    - "Send frames with 10 different source MACs on same port"
+    - "Verify all 10 MACs learned and associated with that port"
+  expected_result:
+    all_macs_learned: true
+
+SWITCH_ADDR_021:
+  tc8_reference: "5.5.21"
+  title: "Aging Timer Accuracy"
+  description: "Verify MAC aging timer expires within acceptable tolerance of configured value"
+  priority: medium
+  timing_tier: tier_b
+  parameters:
+    aging_tolerance_percent: 10
+  test_procedure:
+    - "Learn MAC on port"
+    - "Measure time until entry ages out"
+    - "Verify within ±10% of configured aging time"
+  expected_result:
+    aging_accurate: true

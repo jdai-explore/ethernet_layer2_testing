@@ -177,7 +177,13 @@ class ConfigManager:
             return self._spec_definitions
 
         for yaml_file in sorted(self.spec_dir.glob("*.yaml")):
-            raw = self._load_yaml(yaml_file)
+            # Use safe_load_all to handle multi-document YAML (--- separators)
+            raw: dict[str, Any] = {}
+            with open(yaml_file, "r", encoding="utf-8") as fh:
+                for doc in yaml.safe_load_all(fh):
+                    if doc and isinstance(doc, dict):
+                        raw.update(doc)
+
             for spec_id, spec_data in raw.items():
                 if not isinstance(spec_data, dict):
                     continue
@@ -208,6 +214,7 @@ class ConfigManager:
 
         logger.info("Loaded %d spec definitions from %s", len(self._spec_definitions), self.spec_dir)
         return self._spec_definitions
+
 
     @property
     def spec_definitions(self) -> dict[str, TestSpecDefinition]:

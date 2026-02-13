@@ -153,3 +153,157 @@ SWITCH_VLAN_010:
     - "Verify inner tag preserved"
   expected_result:
     forward_to: "member_ports_only"
+
+SWITCH_VLAN_011:
+  tc8_reference: "5.3.11"
+  title: "VLAN Membership — All Ports Verification"
+  description: "Verify VLAN membership forwarding across all DUT ports simultaneously"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Configure VLAN X with all ports as members"
+    - "Send tagged frame from each port"
+    - "Verify flood to all other member ports"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_VLAN_012:
+  tc8_reference: "5.3.12"
+  title: "VLAN Isolation Between VLANs"
+  description: "Verify traffic in one VLAN does not leak to another VLAN"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Configure Port A in VLAN 10, Port B in VLAN 20"
+    - "Send frame on Port A (VLAN 10)"
+    - "Verify Port B (VLAN 20) does NOT receive frame"
+  expected_result:
+    tag_action: "drop"
+    strict_forwarding: true
+
+SWITCH_VLAN_013:
+  tc8_reference: "5.3.13"
+  title: "Trunk-to-Access Tag Removal"
+  description: "Verify tag is removed when forwarding from trunk to access port"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Send tagged frame on trunk port"
+    - "Verify untagged frame on access egress"
+  expected_result:
+    tag_action: "untagged"
+
+SWITCH_VLAN_014:
+  tc8_reference: "5.3.14"
+  title: "Access-to-Trunk Tag Insertion"
+  description: "Verify tag is inserted when forwarding from access to trunk port"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Send untagged frame on access port"
+    - "Verify tagged frame on trunk egress"
+  expected_result:
+    tag_action: "tagged"
+
+SWITCH_VLAN_015:
+  tc8_reference: "5.3.15"
+  title: "PVID Mismatch Between Ports"
+  description: "Verify behavior when ingress and egress ports have different PVIDs"
+  priority: medium
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Set Port A PVID=10, Port B PVID=20"
+    - "Send untagged frame on Port A"
+    - "Verify frame classified as VLAN 10"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_VLAN_016:
+  tc8_reference: "5.3.16"
+  title: "Double-Tagged — S-VLAN Forwarding"
+  description: "Verify forwarding based on outer S-VLAN for Q-in-Q frames"
+  priority: medium
+  parameters:
+    outer_vid_range: [1, 4094]
+    inner_vid_range: [1, 4094]
+    frame_types: [double_tagged]
+  preconditions:
+    - "DUT supports 802.1ad (Q-in-Q)"
+  test_procedure:
+    - "Send double-tagged frame"
+    - "Verify forwarding based on outer S-VLAN membership"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_VLAN_017:
+  tc8_reference: "5.3.17"
+  title: "Double-Tagged — C-VLAN Preservation"
+  description: "Verify inner C-VLAN tag is preserved during Q-in-Q forwarding"
+  priority: medium
+  parameters:
+    outer_vid_range: [1, 4094]
+    inner_vid_range: [1, 4094]
+    frame_types: [double_tagged]
+  test_procedure:
+    - "Send double-tagged frame"
+    - "Verify inner C-VLAN VID + PCP unchanged on egress"
+  expected_result:
+    inner_tag_preserved: true
+
+SWITCH_VLAN_018:
+  tc8_reference: "5.3.18"
+  title: "Double-Tagged — Outer Tag Strip"
+  description: "Verify outer S-VLAN tag stripping on access egress"
+  priority: medium
+  parameters:
+    frame_types: [double_tagged]
+  test_procedure:
+    - "Send double-tagged frame on trunk"
+    - "Verify only inner tag present on access egress"
+  expected_result:
+    tag_action: "untagged"
+
+SWITCH_VLAN_019:
+  tc8_reference: "5.3.19"
+  title: "Ingress VLAN Filtering"
+  description: "Verify ingress filtering drops frames with VID not in port membership"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Send tagged frame with VID not in ingress port membership"
+    - "Verify frame dropped"
+  expected_result:
+    tag_action: "drop"
+
+SWITCH_VLAN_020:
+  tc8_reference: "5.3.20"
+  title: "Egress VLAN Filtering"
+  description: "Verify egress filtering prevents forwarding to non-member egress ports"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Send tagged frame with VID"
+    - "Verify not forwarded to ports not in VLAN membership"
+  expected_result:
+    tag_action: "drop"
+    strict_forwarding: true
+
+SWITCH_VLAN_021:
+  tc8_reference: "5.3.21"
+  title: "Reserved VID 4095 Handling"
+  description: "Verify frames with reserved VID 4095 are dropped per IEEE 802.1Q"
+  priority: medium
+  parameters:
+    vid_range: [4095, 4095]
+  test_procedure:
+    - "Send tagged frame with VID=4095"
+    - "Verify frame is dropped"
+  expected_result:
+    tag_action: "drop"

@@ -18,6 +18,7 @@ from typing import Any, Callable
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
 from src.core.session_manager import SessionManager
+from src.specs.spec_registry import SpecRegistry
 from src.models.test_case import (
     DUTProfile,
     FrameCapture,
@@ -190,6 +191,14 @@ class TestRunner:
         self._running = False
         self._cancel_requested = False
 
+        # Initialize spec registry for section-specific dispatch
+        try:
+            self._spec_registry = SpecRegistry(config, self.validator)
+            logger.info("SpecRegistry loaded — %d sections", len(self._spec_registry.supported_sections))
+        except Exception as exc:
+            logger.warning("SpecRegistry unavailable (fallback to generic): %s", exc)
+            self._spec_registry = None
+
     @property
     def is_running(self) -> bool:
         return self._running
@@ -299,6 +308,14 @@ class TestRunner:
                         message="Session setup failed — DUT not in clean state",
                     )
 
+                # Try spec registry first (section-specific logic)
+                if self._spec_registry is not None and self._spec_registry.has_handler(case.section):
+                    spec = self.config.spec_definitions.get(case.spec_id)
+                    if spec is not None:
+                        handler = self._spec_registry.get_handler(case.section)
+                        return await handler.execute_spec(spec, case, self.interface)
+
+                # Fallback: generic send/capture flow
                 t0 = time.perf_counter()
 
                 # Build and send frame
@@ -333,6 +350,7 @@ class TestRunner:
                 message=f"Framework error: {exc}",
                 error_detail=str(exc),
             )
+
 
     async def _send_test_frame(self, case: TestCase) -> list[FrameCapture]:
         """Send test frame(s) via the DUT interface."""

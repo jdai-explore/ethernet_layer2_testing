@@ -71,6 +71,89 @@ SWITCH_FILT_005:
   expected_result:
     rate_limited: true
 
+SWITCH_FILT_006:
+  tc8_reference: "5.6.6"
+  title: "Multicast Group Join Filtering"
+  description: "Verify multicast frames forwarded only to ports that have joined the group"
+  priority: medium
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Configure multicast group membership on selected ports"
+    - "Send multicast frame"
+    - "Verify forwarded only to registered ports"
+  expected_result:
+    forward_to: "registered_ports"
+
+SWITCH_FILT_007:
+  tc8_reference: "5.6.7"
+  title: "Multicast Group Leave Filtering"
+  description: "Verify multicast frames no longer forwarded to ports that left the group"
+  priority: medium
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Remove port from multicast group"
+    - "Send multicast frame"
+    - "Verify frame NOT forwarded to removed port"
+  expected_result:
+    forward_to: "registered_ports"
+
+SWITCH_FILT_008:
+  tc8_reference: "5.6.8"
+  title: "Broadcast Storm Rate Limiting"
+  description: "Verify rate limiting engages for broadcast flood under storm conditions"
+  priority: medium
+  timing_tier: tier_b
+  parameters:
+    rates_pps: [1000, 10000]
+    threshold_pps: 500
+  test_procedure:
+    - "Send broadcast frames exceeding rate limit threshold"
+    - "Verify egress rate capped at configured limit"
+  expected_result:
+    rate_limited: true
+
+SWITCH_FILT_009:
+  tc8_reference: "5.6.9"
+  title: "Broadcast Storm Recovery"
+  description: "Verify normal forwarding resumes after broadcast storm subsides"
+  priority: medium
+  test_procedure:
+    - "Generate broadcast storm"
+    - "Reduce traffic below threshold"
+    - "Verify normal forwarding resumes without DUT intervention"
+  expected_result:
+    normal_forwarding_resumed: true
+
+SWITCH_FILT_010:
+  tc8_reference: "5.6.10"
+  title: "EtherType-Based Filtering"
+  description: "Verify switch can filter frames based on EtherType value"
+  priority: low
+  parameters:
+    ethertypes: [0x0800, 0x0806, 0x86DD]
+  test_procedure:
+    - "Configure EtherType filter rule"
+    - "Send frame with filtered EtherType"
+    - "Verify frame dropped"
+  expected_result:
+    tag_action: "drop"
+
+SWITCH_FILT_011:
+  tc8_reference: "5.6.11"
+  title: "EtherType Allow List"
+  description: "Verify frames with allowed EtherTypes are forwarded normally"
+  priority: low
+  parameters:
+    ethertypes: [0x0800, 0x0806]
+  test_procedure:
+    - "Configure EtherType allow list"
+    - "Send frame with allowed EtherType"
+    - "Verify normal forwarding"
+  expected_result:
+    forward_to: "learned_port"
+
 ---
 # TC8 Layer 2 v3.0 — Section 5.7 Time Synchronization
 

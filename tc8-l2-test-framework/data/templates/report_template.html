@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TC8 Layer 2 Test Report — {{ report.report_id }}</title>
+    <style>
+        :root {
+            --color-pass: #22c55e;
+            --color-fail: #ef4444;
+            --color-info: #3b82f6;
+            --color-skip: #a3a3a3;
+            --color-error: #f59e0b;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg); color: var(--text);
+            line-height: 1.6; padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+        h2 { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: var(--text); }
+        .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+        .header-meta { text-align: right; font-size: 0.85rem; color: var(--text-dim); }
+
+        /* Summary Cards */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
+        .card .value { font-size: 1.8rem; font-weight: 700; }
+        .card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+        .card.pass .value { color: var(--color-pass); }
+        .card.fail .value { color: var(--color-fail); }
+        .card.info .value { color: var(--color-info); }
+        .card.skip .value { color: var(--color-skip); }
+        .card.error .value { color: var(--color-error); }
+
+        /* Progress Bar */
+        .progress-bar { height: 8px; border-radius: 4px; background: var(--surface); overflow: hidden; margin-bottom: 1.5rem; display: flex; }
+        .progress-bar .seg { height: 100%; }
+        .seg.pass { background: var(--color-pass); }
+        .seg.fail { background: var(--color-fail); }
+        .seg.info { background: var(--color-info); }
+        .seg.skip { background: var(--color-skip); }
+        .seg.error { background: var(--color-error); }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid var(--border); color: var(--text-dim); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        /* Status badges */
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .badge.pass { background: rgba(34,197,94,0.15); color: var(--color-pass); }
+        .badge.fail { background: rgba(239,68,68,0.15); color: var(--color-fail); }
+        .badge.informational { background: rgba(59,130,246,0.15); color: var(--color-info); }
+        .badge.skip { background: rgba(163,163,163,0.15); color: var(--color-skip); }
+        .badge.error { background: rgba(245,158,11,0.15); color: var(--color-error); }
+
+        /* Sections */
+        .section-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+        .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+        .section-card h3 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .section-card .stats { display: flex; gap: 0.75rem; font-size: 0.8rem; }
+        .section-card .stats span { display: flex; align-items: center; gap: 0.25rem; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .dot.pass { background: var(--color-pass); }
+        .dot.fail { background: var(--color-fail); }
+        .dot.info { background: var(--color-info); }
+
+        .message { color: var(--text-dim); font-size: 0.8rem; font-style: italic; }
+        .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim); text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>TC8 Layer 2 Test Report</h1>
+            <div class="subtitle">
+                OPEN Alliance TC8 v{{ tc8_version }} Compliance — 
+                {% if report.dut_profile %}{{ report.dut_profile.name }}{% else %}Unknown DUT{% endif %}
+            </div>
+        </div>
+        <div class="header-meta">
+            <div>Report: <strong>{{ report.report_id }}</strong></div>
+            <div>Tier: <strong>{{ report.tier.value | upper }}</strong></div>
+            <div>Duration: <strong>{{ "%.1f" | format(report.duration_s) }}s</strong></div>
+            <div>{{ generated_at }}</div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="cards">
+        <div class="card">
+            <div class="value">{{ report.total_cases }}</div>
+            <div class="label">Total</div>
+        </div>
+        <div class="card pass">
+            <div class="value">{{ report.passed }}</div>
+            <div class="label">Passed</div>
+        </div>
+        <div class="card fail">
+            <div class="value">{{ report.failed }}</div>
+            <div class="label">Failed</div>
+        </div>
+        <div class="card info">
+            <div class="value">{{ report.informational }}</div>
+            <div class="label">Info</div>
+        </div>
+        <div class="card skip">
+            <div class="value">{{ report.skipped }}</div>
+            <div class="label">Skipped</div>
+        </div>
+        <div class="card error">
+            <div class="value">{{ report.errors }}</div>
+            <div class="label">Errors</div>
+        </div>
+        <div class="card pass">
+            <div class="value">{{ pass_rate }}%</div>
+            <div class="label">Pass Rate</div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    {% set total = report.total_cases if report.total_cases > 0 else 1 %}
+    <div class="progress-bar">
+        <div class="seg pass" style="width:{{ (report.passed / total * 100) | round(1) }}%"></div>
+        <div class="seg fail" style="width:{{ (report.failed / total * 100) | round(1) }}%"></div>
+        <div class="seg info" style="width:{{ (report.informational / total * 100) | round(1) }}%"></div>
+        <div class="seg skip" style="width:{{ (report.skipped / total * 100) | round(1) }}%"></div>
+        <div class="seg error" style="width:{{ (report.errors / total * 100) | round(1) }}%"></div>
+    </div>
+
+    <!-- Section Breakdown -->
+    <h2>Section Breakdown</h2>
+    <div class="section-grid">
+        {% for sec_name, stats in section_stats.items() %}
+        <div class="section-card">
+            <h3>{{ sec_name | replace("_", " ") | title }}</h3>
+            <div class="stats">
+                <span><span class="dot pass"></span> {{ stats.pass }}</span>
+                <span><span class="dot fail"></span> {{ stats.fail }}</span>
+                <span><span class="dot info"></span> {{ stats.info }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Failures -->
+    {% if failures %}
+    <h2>⚠ Failures ({{ failures | length }})</h2>
+    <table>
+        <thead>
+            <tr><th>Case ID</th><th>Spec</th><th>Section</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+            {% for r in failures %}
+            <tr>
+                <td>{{ r.case_id }}</td>
+                <td>{{ r.spec_id }}</td>
+                <td>{{ r.section.value if r.section else '-' }}</td>
+                <td class="message">{{ r.message or 'No details' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Errors -->
+    {% if errors %}
+    <h2>🔴 Errors ({{ errors | length }})</h2>
+    <table>
+        <thead>
+            <tr><th>Case ID</th><th>Spec</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+            {% for r in errors %}
+            <tr>
+                <td>{{ r.case_id }}</td>
+                <td>{{ r.spec_id }}</td>
+                <td class="message">{{ r.message or r.error_detail or 'Unknown error' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- All Results -->
+    <h2>All Results ({{ report.results | length }})</h2>
+    <table>
+        <thead>
+            <tr><th>Status</th><th>Case ID</th><th>Spec</th><th>Section</th><th>Duration</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+            {% for r in report.results %}
+            <tr>
+                <td><span class="badge {{ r.status.value }}">{{ r.status.value }}</span></td>
+                <td>{{ r.case_id }}</td>
+                <td>{{ r.spec_id }}</td>
+                <td>{{ r.section.value if r.section else '-' }}</td>
+                <td>{{ "%.1f" | format(r.duration_ms) }}ms</td>
+                <td class="message">{{ r.message or '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        TC8 L2 Test Framework v{{ framework_version }} — Generated {{ generated_at }}
+    </div>
+</div>
+</body>
+</html>
