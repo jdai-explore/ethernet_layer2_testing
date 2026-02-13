@@ -774,5 +774,20 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
+## 15. Optional: Extended Diagnostic Session Management
+
+For ECUs that require active session maintenance during configuration or testing, the framework supports an optional **Tester Present** heartbeat mechanism.
+
+### Use Cases
+- **Dynamic Configuration**: Keeping an ECU in *Extended Diagnostic* or *Programming* sessions via DoIP while modifying L2 parameters.
+- **State Preservation**: Preventing the ECU from reverting to default networking states during long-duration (40h+) test runs.
+
+### Implementation Concept
+- **Background Heartbeat**: An asynchronous worker in the `SessionManager` sends `$3E 80` (Tester Present, no response required) every 2–4 seconds.
+- **DoIP Integration**: Utilizes the pluggable `DUTController` protocol to send heartbeat packets concurrently with L2 test frames.
+- **Configurable**: Enabled/disabled via the DUT Profile YAML with adjustable $S3$ timeout intervals.
+
+---
+
 *Document prepared by: TC8-L2 Test Framework Engineering Team*  
 *Reference: OPEN Alliance Automotive Ethernet ECU Test Specification — Layer 2, v3.0*

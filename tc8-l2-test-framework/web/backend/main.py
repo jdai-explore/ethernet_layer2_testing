@@ -6,15 +6,21 @@ Provides REST API and WebSocket endpoints for:
 - DUT profile management
 - Spec browsing
 - Report access and history
+- Pre-flight self-validation
+- Real-time log streaming
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import traceback
+from collections import deque
 from pathlib import Path
 from typing import Any
 
+import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -22,11 +28,19 @@ from pydantic import BaseModel
 
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
-from src.core.session_manager import SessionManager
+from src.core.session_manager import SessionManager, NullDUTController
 from src.core.test_runner import TestRunner
-from src.models.test_case import TestSection, TestStatus, TestTier
+from src.models.test_case import (
+    DUTProfile,
+    PortConfig,
+    TestSection,
+    TestStatus,
+    TestTier,
+)
 from src.reporting.report_generator import ReportGenerator
 from src.reporting.result_store import ResultStore
+from src.specs.spec_registry import SpecRegistry
+from src.utils.frame_builder import FrameBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +51,54 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="TC8 Layer 2 Test Framework",
     description="OPEN Alliance TC8 Automotive Ethernet ECU Conformance Testing",
-    version="2.0.0",
+    version="3.0.0",
 )
 
 # Global state
 config = ConfigManager()
 active_runner: TestRunner | None = None
 connected_websockets: list[WebSocket] = []
+log_websockets: list[WebSocket] = []
 result_store = ResultStore()
 report_gen = ReportGenerator()
+
+# Log buffer for late-connecting clients
+log_buffer: deque[dict] = deque(maxlen=200)
+
+
+# ---------------------------------------------------------------------------
+# WebSocket Log Handler
+# ---------------------------------------------------------------------------
+
+
+class WebSocketLogHandler(logging.Handler):
+    """Forward Python log records to connected WebSocket clients."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            entry = {
+                "type": "log",
+                "level": record.levelname,
+                "name": record.name,
+                "message": self.format(record),
+                "time": record.created,
+            }
+            log_buffer.append(entry)
+            for ws in list(log_websockets):
+                try:
+                    asyncio.get_event_loop().create_task(ws.send_json(entry))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+# Install the log handler on the root logger
+_ws_handler = WebSocketLogHandler()
+_ws_handler.setLevel(logging.DEBUG)
+_ws_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S"))
+logging.getLogger().addHandler(_ws_handler)
+logging.getLogger().setLevel(logging.DEBUG)
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +130,41 @@ class SpecListResponse(BaseModel):
     total: int
 
 
+class DUTProfileRequest(BaseModel):
+    """Form data for creating/updating a DUT profile."""
+    dut_name: str
+    model: str = ""
+    firmware: str = "unknown"
+    port_count: int = 4
+    mac_table_size: int = 1024
+    mac_aging_time: int = 300
+    double_tagging: bool = False
+    gptp: bool = False
+    can_reset: bool = False
+    ports: list[dict[str, Any]] | None = None
+
+
+class PreflightResult(BaseModel):
+    name: str
+    status: str  # "pass" or "fail"
+    detail: str
+
+
+# ---------------------------------------------------------------------------
+# Section Map (shared)
+# ---------------------------------------------------------------------------
+
+SECTION_MAP = {
+    "5.3": TestSection.VLAN,
+    "5.4": TestSection.GENERAL,
+    "5.5": TestSection.ADDRESS_LEARNING,
+    "5.6": TestSection.FILTERING,
+    "5.7": TestSection.TIME_SYNC,
+    "5.8": TestSection.QOS,
+    "5.9": TestSection.CONFIGURATION,
+}
+
+
 # ---------------------------------------------------------------------------
 # REST API Endpoints
 # ---------------------------------------------------------------------------
@@ -85,7 +173,7 @@ class SpecListResponse(BaseModel):
 @app.get("/api/health")
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
-    return {"status": "ok", "service": "tc8-l2-test-framework", "version": "2.0.0"}
+    return {"status": "ok", "service": "tc8-l2-test-framework", "version": "3.0.0"}
 
 
 @app.get("/api/specs", response_model=SpecListResponse)
@@ -94,18 +182,8 @@ async def list_specs(section: str | None = None) -> SpecListResponse:
     config.load_spec_definitions()
     specs = list(config.spec_definitions.values())
 
-    section_map = {
-        "5.3": TestSection.VLAN,
-        "5.4": TestSection.GENERAL,
-        "5.5": TestSection.ADDRESS_LEARNING,
-        "5.6": TestSection.FILTERING,
-        "5.7": TestSection.TIME_SYNC,
-        "5.8": TestSection.QOS,
-        "5.9": TestSection.CONFIGURATION,
-    }
-
-    if section and section in section_map:
-        specs = [s for s in specs if s.section == section_map[section]]
+    if section and section in SECTION_MAP:
+        specs = [s for s in specs if s.section == SECTION_MAP[section]]
 
     spec_dicts = [
         {
@@ -136,18 +214,9 @@ async def run_suite(request: RunSuiteRequest) -> RunSuiteResponse:
     config.load_spec_definitions()
 
     # Parse sections
-    section_map = {
-        "5.3": TestSection.VLAN,
-        "5.4": TestSection.GENERAL,
-        "5.5": TestSection.ADDRESS_LEARNING,
-        "5.6": TestSection.FILTERING,
-        "5.7": TestSection.TIME_SYNC,
-        "5.8": TestSection.QOS,
-        "5.9": TestSection.CONFIGURATION,
-    }
     sections = None
     if request.sections:
-        sections = [section_map[s] for s in request.sections if s in section_map]
+        sections = [SECTION_MAP[s] for s in request.sections if s in SECTION_MAP]
 
     # Setup runner
     session_mgr = SessionManager(dut_profile)
@@ -206,15 +275,217 @@ async def cancel_run() -> dict[str, str]:
     return {"status": "no_active_run"}
 
 
+# ---------------------------------------------------------------------------
+# DUT Profile Management
+# ---------------------------------------------------------------------------
+
+
 @app.get("/api/dut-profiles")
 async def list_dut_profiles() -> dict[str, Any]:
     """List available DUT profiles."""
     profiles_dir = config.config_dir / "dut_profiles"
     profiles = []
     if profiles_dir.exists():
-        for f in profiles_dir.glob("*.yaml"):
-            profiles.append({"name": f.stem, "path": str(f)})
+        for f in sorted(profiles_dir.rglob("*.yaml")):
+            profiles.append({"name": f.stem, "path": str(f.relative_to(config.config_dir / "dut_profiles"))})
     return {"profiles": profiles}
+
+
+@app.get("/api/dut-profiles/{name}")
+async def get_dut_profile(name: str) -> dict[str, Any]:
+    """Load full details of a specific DUT profile."""
+    profiles_dir = config.config_dir / "dut_profiles"
+    # Search recursively
+    matches = list(profiles_dir.rglob(f"{name}.yaml"))
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"Profile '{name}' not found")
+    profile_path = matches[0]
+    try:
+        data = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+        return {"name": name, "path": str(profile_path), "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read profile: {e}")
+
+
+@app.post("/api/dut-profiles")
+async def create_dut_profile(request: DUTProfileRequest) -> dict[str, Any]:
+    """Create a new DUT profile from form data and save as YAML."""
+    profiles_dir = config.config_dir / "dut_profiles"
+    profiles_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build port configs
+    ports_data = []
+    if request.ports:
+        for p in request.ports:
+            ports_data.append(p)
+    else:
+        for i in range(request.port_count):
+            ports_data.append({
+                "port_id": i,
+                "interface_name": f"eth{i}",
+                "mac_address": f"02:00:00:00:00:{i + 1:02x}",
+                "speed_mbps": 100,
+                "vlan_membership": [1],
+                "pvid": 1,
+                "is_trunk": False,
+            })
+
+    profile_data = {
+        "name": request.dut_name,
+        "model": request.model,
+        "firmware_version": request.firmware,
+        "port_count": request.port_count,
+        "ports": ports_data,
+        "max_mac_table_size": request.mac_table_size,
+        "mac_aging_time_s": request.mac_aging_time,
+        "supports_double_tagging": request.double_tagging,
+        "supports_gptp": request.gptp,
+        "can_reset": request.can_reset,
+    }
+
+    # Save YAML
+    safe_name = request.dut_name.lower().replace(" ", "_").replace("-", "_")
+    output_path = profiles_dir / f"{safe_name}.yaml"
+    output_path.write_text(yaml.dump(profile_data, default_flow_style=False, sort_keys=False), encoding="utf-8")
+
+    logger.info("Created DUT profile: %s → %s", request.dut_name, output_path)
+    return {"status": "created", "name": safe_name, "path": str(output_path)}
+
+
+@app.put("/api/dut-profiles/{name}")
+async def update_dut_profile(name: str, request: DUTProfileRequest) -> dict[str, Any]:
+    """Update an existing DUT profile."""
+    profiles_dir = config.config_dir / "dut_profiles"
+    matches = list(profiles_dir.rglob(f"{name}.yaml"))
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"Profile '{name}' not found")
+
+    profile_path = matches[0]
+
+    # Build updated data
+    ports_data = []
+    if request.ports:
+        for p in request.ports:
+            ports_data.append(p)
+    else:
+        for i in range(request.port_count):
+            ports_data.append({
+                "port_id": i,
+                "interface_name": f"eth{i}",
+                "mac_address": f"02:00:00:00:00:{i + 1:02x}",
+                "speed_mbps": 100,
+                "vlan_membership": [1],
+                "pvid": 1,
+                "is_trunk": False,
+            })
+
+    profile_data = {
+        "name": request.dut_name,
+        "model": request.model,
+        "firmware_version": request.firmware,
+        "port_count": request.port_count,
+        "ports": ports_data,
+        "max_mac_table_size": request.mac_table_size,
+        "mac_aging_time_s": request.mac_aging_time,
+        "supports_double_tagging": request.double_tagging,
+        "supports_gptp": request.gptp,
+        "can_reset": request.can_reset,
+    }
+
+    profile_path.write_text(yaml.dump(profile_data, default_flow_style=False, sort_keys=False), encoding="utf-8")
+    logger.info("Updated DUT profile: %s", name)
+    return {"status": "updated", "name": name, "path": str(profile_path)}
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight Checks
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/preflight")
+async def run_preflight() -> dict[str, Any]:
+    """Run framework self-validation checks."""
+    checks: list[dict[str, str]] = []
+
+    # 1. Spec Registry
+    try:
+        config.load_spec_definitions()
+        count = len(config.spec_definitions)
+        if count >= 71:
+            checks.append({"name": "Spec Registry", "status": "pass", "detail": f"{count} specs loaded"})
+        else:
+            checks.append({"name": "Spec Registry", "status": "fail", "detail": f"Only {count}/71 specs found"})
+    except Exception as e:
+        checks.append({"name": "Spec Registry", "status": "fail", "detail": str(e)})
+
+    # 2. Frame Builder
+    try:
+        fb = FrameBuilder()
+        frame = fb.untagged_unicast(payload_size=64)
+        tagged = fb.single_tagged(vid=100, payload_size=64)
+        if frame is not None and tagged is not None:
+            checks.append({"name": "Frame Builder", "status": "pass", "detail": f"Untagged ({len(frame)}B) + Tagged ({len(tagged)}B) OK"})
+        else:
+            checks.append({"name": "Frame Builder", "status": "fail", "detail": "Frame construction returned None"})
+    except Exception as e:
+        checks.append({"name": "Frame Builder", "status": "fail", "detail": str(e)})
+
+    # 3. Config Validation
+    try:
+        test_profile = DUTProfile(
+            name="Preflight-Test",
+            model="SIM",
+            port_count=4,
+            ports=[
+                PortConfig(port_id=i, interface_name=f"eth{i}", mac_address=f"02:00:00:00:00:{i:02x}", vlan_membership=[1])
+                for i in range(4)
+            ],
+        )
+        checks.append({"name": "Config Validation", "status": "pass", "detail": f"DUTProfile created: {test_profile.name}"})
+    except Exception as e:
+        checks.append({"name": "Config Validation", "status": "fail", "detail": str(e)})
+
+    # 4. Database Connectivity
+    try:
+        count = result_store.count_runs()
+        checks.append({"name": "Database", "status": "pass", "detail": f"Connected, {count} runs stored"})
+    except Exception as e:
+        checks.append({"name": "Database", "status": "fail", "detail": str(e)})
+
+    # 5. Session Manager
+    try:
+        sm = SessionManager(
+            dut_profile=test_profile,
+            controller=NullDUTController(),
+            cleanup_wait_s=0.0,
+            aging_wait_s=0.0,
+        )
+        state = await sm.setup()
+        if state.is_clean:
+            checks.append({"name": "Session Manager", "status": "pass", "detail": f"Session {state.session_id} clean"})
+        else:
+            checks.append({"name": "Session Manager", "status": "fail", "detail": "Session not clean"})
+    except Exception as e:
+        checks.append({"name": "Session Manager", "status": "fail", "detail": str(e)})
+
+    # 6. Report Generator
+    try:
+        rg = ReportGenerator()
+        checks.append({"name": "Report Generator", "status": "pass", "detail": "Template engine ready"})
+    except Exception as e:
+        checks.append({"name": "Report Generator", "status": "fail", "detail": str(e)})
+
+    # 7. DUT Profiles Directory
+    try:
+        profiles_dir = config.config_dir / "dut_profiles"
+        count = len(list(profiles_dir.rglob("*.yaml"))) if profiles_dir.exists() else 0
+        checks.append({"name": "DUT Profiles", "status": "pass" if count > 0 else "fail", "detail": f"{count} profiles found"})
+    except Exception as e:
+        checks.append({"name": "DUT Profiles", "status": "fail", "detail": str(e)})
+
+    passed = sum(1 for c in checks if c["status"] == "pass")
+    total = len(checks)
+    return {"checks": checks, "passed": passed, "total": total}
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +543,25 @@ async def websocket_progress(websocket: WebSocket) -> None:
         connected_websockets.remove(websocket)
 
 
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time log streaming."""
+    await websocket.accept()
+    log_websockets.append(websocket)
+    # Send buffered logs to new client
+    for entry in list(log_buffer):
+        try:
+            await websocket.send_json(entry)
+        except Exception:
+            break
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        if websocket in log_websockets:
+            log_websockets.remove(websocket)
+
+
 # ---------------------------------------------------------------------------
 # Static files & frontend
 # ---------------------------------------------------------------------------
@@ -284,7 +574,7 @@ if _static_dir.exists():
 
 @app.get("/", response_class=HTMLResponse)
 async def index() -> str:
-    """Serve the main web UI dashboard."""
+    """Serve the main web UI dashboard with tabbed interface."""
     # Load dynamic data
     config.load_spec_definitions()
     spec_count = len(config.spec_definitions)
@@ -306,7 +596,14 @@ async def index() -> str:
             <td>{r['created_at'][:19] if r['created_at'] else '—'}</td>
         </tr>"""
 
-    no_runs_msg = '<tr><td colspan="7" style="text-align:center;color:#64748b">No test runs yet. Use the CLI or API to run tests.</td></tr>' if not recent_runs else ""
+    no_runs_msg = '<tr><td colspan="7" style="text-align:center;color:#64748b">No test runs yet. Use the Run Tests tab or CLI to start.</td></tr>' if not recent_runs else ""
+
+    # Load DUT profiles for dropdowns
+    profiles_dir = config.config_dir / "dut_profiles"
+    profiles_json = "[]"
+    if profiles_dir.exists():
+        profiles = [{"name": f.stem, "path": str(f.relative_to(config.config_dir / "dut_profiles"))} for f in sorted(profiles_dir.rglob("*.yaml"))]
+        profiles_json = json.dumps(profiles)
 
     return f"""
     <!DOCTYPE html>
@@ -316,7 +613,7 @@ async def index() -> str:
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>TC8 L2 Test Framework</title>
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             body {{
                 font-family: 'Inter', system-ui, sans-serif;
@@ -324,133 +621,623 @@ async def index() -> str:
                 color: #e2e8f0;
                 min-height: 100vh;
             }}
-            .container {{ max-width: 1200px; margin: 0 auto; padding: 2rem; }}
+            .container {{ max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; }}
             h1 {{
-                font-size: 1.75rem; font-weight: 700;
+                font-size: 1.5rem; font-weight: 700;
                 background: linear-gradient(135deg, #60a5fa, #a78bfa);
                 -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                margin-bottom: 0.25rem;
+                margin-bottom: 0.15rem;
             }}
-            .subtitle {{ color: #94a3b8; margin-bottom: 2rem; font-size: 0.9rem; }}
+            .subtitle {{ color: #94a3b8; margin-bottom: 1rem; font-size: 0.82rem; }}
 
-            /* Cards */
-            .cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }}
+            /* ── Tabs ── */
+            .tab-bar {{
+                display: flex; gap: 0; border-bottom: 2px solid #334155;
+                margin-bottom: 1.25rem;
+            }}
+            .tab-btn {{
+                padding: 0.6rem 1.2rem; font-size: 0.8rem; font-weight: 600;
+                color: #94a3b8; background: none; border: none; cursor: pointer;
+                border-bottom: 2px solid transparent; margin-bottom: -2px;
+                transition: color 0.2s, border-color 0.2s; white-space: nowrap;
+                font-family: inherit;
+            }}
+            .tab-btn:hover {{ color: #e2e8f0; }}
+            .tab-btn.active {{ color: #60a5fa; border-bottom-color: #60a5fa; }}
+            .tab-content {{ display: none; animation: fadeIn 0.25s ease; }}
+            .tab-content.active {{ display: block; }}
+            @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(4px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+
+            /* ── Cards ── */
+            .cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }}
             .card {{
                 background: #1e293b; border: 1px solid #334155; border-radius: 10px;
-                padding: 1.25rem; text-align: center;
+                padding: 1.1rem; text-align: center;
             }}
-            .card .value {{ font-size: 2rem; font-weight: 700; }}
+            .card .value {{ font-size: 1.8rem; font-weight: 700; }}
             .card .label {{
-                font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
-                color: #94a3b8; margin-top: 0.25rem;
+                font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+                color: #94a3b8; margin-top: 0.2rem;
             }}
             .card.primary .value {{ color: #60a5fa; }}
             .card.green .value {{ color: #22c55e; }}
             .card.amber .value {{ color: #f59e0b; }}
 
-            /* Sections */
+            /* ── Section Chips ── */
             .section-grid {{
-                display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 0.75rem; margin-bottom: 1.5rem;
+                display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+                gap: 0.6rem; margin-bottom: 1.25rem;
             }}
             .section-chip {{
                 background: #1e293b; border: 1px solid #334155; border-radius: 8px;
-                padding: 0.75rem 1rem; display: flex; justify-content: space-between;
-                align-items: center; font-size: 0.85rem;
+                padding: 0.6rem 0.8rem; display: flex; justify-content: space-between;
+                align-items: center; font-size: 0.82rem;
             }}
             .section-chip .count {{
-                background: #334155; padding: 0.15rem 0.5rem; border-radius: 999px;
-                font-size: 0.75rem; font-weight: 600;
+                background: #334155; padding: 0.1rem 0.45rem; border-radius: 999px;
+                font-size: 0.72rem; font-weight: 600;
             }}
 
-            /* Table */
+            /* ── Panel ── */
             .panel {{
                 background: #1e293b; border: 1px solid #334155; border-radius: 10px;
-                padding: 1.25rem; margin-bottom: 1.5rem;
+                padding: 1.25rem; margin-bottom: 1rem;
             }}
-            .panel h2 {{ font-size: 1rem; font-weight: 600; color: #60a5fa; margin-bottom: 1rem; }}
-            table {{ width: 100%; border-collapse: collapse; font-size: 0.82rem; }}
+            .panel h2 {{ font-size: 0.95rem; font-weight: 600; color: #60a5fa; margin-bottom: 0.8rem; }}
+            table {{ width: 100%; border-collapse: collapse; font-size: 0.8rem; }}
             th {{
-                text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid #334155;
-                color: #94a3b8; font-weight: 600; font-size: 0.7rem; text-transform: uppercase;
+                text-align: left; padding: 0.45rem 0.6rem; border-bottom: 2px solid #334155;
+                color: #94a3b8; font-weight: 600; font-size: 0.68rem; text-transform: uppercase;
                 letter-spacing: 0.04em;
             }}
-            td {{ padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e293b; }}
+            td {{ padding: 0.45rem 0.6rem; border-bottom: 1px solid #1e293b; }}
             tr:hover td {{ background: rgba(255,255,255,0.02); }}
             a {{ text-decoration: none; }}
             .badge {{
-                display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px;
-                font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+                display: inline-block; padding: 0.12rem 0.45rem; border-radius: 4px;
+                font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
                 background: #334155; color: #e2e8f0;
             }}
 
-            /* Links */
-            .links {{ display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.85rem; }}
+            /* ── Forms ── */
+            .form-grid {{
+                display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;
+            }}
+            .form-group {{ display: flex; flex-direction: column; gap: 0.3rem; }}
+            .form-group.full {{ grid-column: 1 / -1; }}
+            label {{
+                font-size: 0.72rem; font-weight: 600; color: #94a3b8;
+                text-transform: uppercase; letter-spacing: 0.04em;
+            }}
+            input[type="text"], input[type="number"], select {{
+                background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+                padding: 0.55rem 0.7rem; color: #e2e8f0; font-size: 0.82rem;
+                font-family: inherit; outline: none;
+                transition: border-color 0.2s;
+            }}
+            input:focus, select:focus {{ border-color: #60a5fa; }}
+            .toggle-row {{
+                display: flex; align-items: center; gap: 0.6rem;
+                font-size: 0.82rem; padding: 0.2rem 0;
+            }}
+            input[type="checkbox"] {{
+                width: 16px; height: 16px; accent-color: #60a5fa; cursor: pointer;
+            }}
+
+            /* ── Buttons ── */
+            .btn {{
+                display: inline-flex; align-items: center; gap: 0.4rem;
+                padding: 0.55rem 1.2rem; border: none; border-radius: 8px;
+                font-size: 0.82rem; font-weight: 600; cursor: pointer;
+                font-family: inherit; transition: all 0.2s;
+            }}
+            .btn-primary {{ background: #3b82f6; color: #fff; }}
+            .btn-primary:hover {{ background: #2563eb; }}
+            .btn-success {{ background: #22c55e; color: #fff; }}
+            .btn-success:hover {{ background: #16a34a; }}
+            .btn-danger {{ background: #ef4444; color: #fff; }}
+            .btn-danger:hover {{ background: #dc2626; }}
+            .btn-ghost {{
+                background: transparent; border: 1px solid #334155; color: #94a3b8;
+            }}
+            .btn-ghost:hover {{ border-color: #60a5fa; color: #60a5fa; }}
+            .btn:disabled {{ opacity: 0.4; cursor: not-allowed; }}
+            .btn-row {{ display: flex; gap: 0.6rem; margin-top: 0.8rem; }}
+
+            /* ── Checklist ── */
+            .check-item {{
+                display: flex; align-items: center; gap: 0.6rem;
+                padding: 0.55rem 0.7rem; border-bottom: 1px solid #1e293b;
+                font-size: 0.82rem;
+            }}
+            .check-icon {{ font-size: 1.1rem; width: 1.4rem; text-align: center; }}
+            .check-detail {{ color: #94a3b8; font-size: 0.75rem; margin-left: auto; }}
+            .check-item.pending .check-icon {{ color: #94a3b8; }}
+            .check-item.pass .check-icon {{ color: #22c55e; }}
+            .check-item.fail .check-icon {{ color: #ef4444; }}
+
+            /* ── Progress ── */
+            .progress-container {{ margin: 1rem 0; }}
+            .progress-bar-bg {{
+                background: #0f172a; border-radius: 999px; height: 8px;
+                overflow: hidden; margin-bottom: 0.3rem;
+            }}
+            .progress-bar-fill {{
+                height: 100%; border-radius: 999px;
+                background: linear-gradient(90deg, #3b82f6, #a78bfa);
+                transition: width 0.3s ease; width: 0%;
+            }}
+            .progress-text {{ font-size: 0.75rem; color: #94a3b8; }}
+
+            /* ── Console ── */
+            .console {{
+                background: #020617; border: 1px solid #1e293b; border-radius: 8px;
+                padding: 0.7rem; height: 420px; overflow-y: auto;
+                font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+                line-height: 1.6;
+            }}
+            .console .log-line {{ white-space: pre-wrap; word-break: break-all; }}
+            .console .log-DEBUG {{ color: #64748b; }}
+            .console .log-INFO {{ color: #94a3b8; }}
+            .console .log-WARNING {{ color: #f59e0b; }}
+            .console .log-ERROR {{ color: #ef4444; }}
+            .console .log-CRITICAL {{ color: #ef4444; font-weight: 700; }}
+            .console-toolbar {{
+                display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem;
+            }}
+            .console-toolbar select {{
+                padding: 0.3rem 0.6rem; font-size: 0.75rem;
+            }}
+            .ws-dot {{
+                width: 8px; height: 8px; border-radius: 50%;
+                display: inline-block; margin-right: 0.3rem;
+            }}
+            .ws-dot.connected {{ background: #22c55e; }}
+            .ws-dot.disconnected {{ background: #ef4444; }}
+
+            /* ── Links ── */
+            .links {{ display: flex; gap: 0.8rem; margin-top: 0.4rem; font-size: 0.82rem; }}
             .links a {{ color: #60a5fa; }}
             .links a:hover {{ text-decoration: underline; }}
+
+            /* ── Status Badge ── */
+            .status-msg {{
+                padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.8rem;
+                margin-top: 0.6rem; display: none;
+            }}
+            .status-msg.success {{ display: block; background: rgba(34,197,94,0.1); border: 1px solid #22c55e; color: #22c55e; }}
+            .status-msg.error {{ display: block; background: rgba(239,68,68,0.1); border: 1px solid #ef4444; color: #ef4444; }}
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>⚡ TC8 Layer 2 Test Framework</h1>
-            <p class="subtitle">OPEN Alliance Automotive Ethernet ECU Conformance Testing — v2.0</p>
+            <h1>TC8 Layer 2 Test Framework</h1>
+            <p class="subtitle">OPEN Alliance Automotive Ethernet ECU Conformance Testing — v3.0</p>
 
-            <div class="cards">
-                <div class="card primary">
-                    <div class="value">{spec_count}</div>
-                    <div class="label">Specifications</div>
+            <!-- ═══ Tab Bar ═══ -->
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="dashboard">🎛️ Dashboard</button>
+                <button class="tab-btn" data-tab="dut-config">🔧 DUT Configuration</button>
+                <button class="tab-btn" data-tab="run-tests">🚀 Run Tests</button>
+                <button class="tab-btn" data-tab="preflight">🩺 Pre-flight Checks</button>
+                <button class="tab-btn" data-tab="console">📋 Console</button>
+            </div>
+
+            <!-- ═══ Tab 1: Dashboard ═══ -->
+            <div class="tab-content active" id="tab-dashboard">
+                <div class="cards">
+                    <div class="card primary"><div class="value">{spec_count}</div><div class="label">Specifications</div></div>
+                    <div class="card green"><div class="value">7</div><div class="label">TC8 Sections</div></div>
+                    <div class="card amber"><div class="value">{run_count}</div><div class="label">Test Runs</div></div>
+                    <div class="card primary"><div class="value">3</div><div class="label">Tiers</div></div>
                 </div>
-                <div class="card green">
-                    <div class="value">7</div>
-                    <div class="label">TC8 Sections</div>
+                <div class="section-grid">
+                    <div class="section-chip">5.3 VLAN Testing <span class="count">21</span></div>
+                    <div class="section-chip">5.4 General <span class="count">10</span></div>
+                    <div class="section-chip">5.5 Address Learning <span class="count">21</span></div>
+                    <div class="section-chip">5.6 Filtering <span class="count">11</span></div>
+                    <div class="section-chip">5.7 Time Sync <span class="count">1</span></div>
+                    <div class="section-chip">5.8 QoS <span class="count">4</span></div>
+                    <div class="section-chip">5.9 Configuration <span class="count">3</span></div>
                 </div>
-                <div class="card amber">
-                    <div class="value">{run_count}</div>
-                    <div class="label">Test Runs</div>
+                <div class="panel">
+                    <h2>📊 Recent Test Runs</h2>
+                    <table>
+                        <thead><tr><th>Report</th><th>DUT</th><th>Tier</th><th>Pass</th><th>Fail</th><th>Rate</th><th>Date</th></tr></thead>
+                        <tbody>{run_rows}{no_runs_msg}</tbody>
+                    </table>
                 </div>
-                <div class="card primary">
-                    <div class="value">3</div>
-                    <div class="label">Tiers</div>
+                <div class="panel">
+                    <h2>🔗 Quick Links</h2>
+                    <div class="links">
+                        <a href="/docs">📖 API Docs</a>
+                        <a href="/api/specs">📋 All Specs</a>
+                        <a href="/api/reports">📊 All Reports</a>
+                        <a href="/api/health">💚 Health</a>
+                    </div>
                 </div>
             </div>
 
-            <div class="section-grid">
-                <div class="section-chip">5.3 VLAN Testing <span class="count">21</span></div>
-                <div class="section-chip">5.4 General <span class="count">10</span></div>
-                <div class="section-chip">5.5 Address Learning <span class="count">21</span></div>
-                <div class="section-chip">5.6 Filtering <span class="count">11</span></div>
-                <div class="section-chip">5.7 Time Sync <span class="count">1</span></div>
-                <div class="section-chip">5.8 QoS <span class="count">4</span></div>
-                <div class="section-chip">5.9 Configuration <span class="count">3</span></div>
+            <!-- ═══ Tab 2: DUT Configuration ═══ -->
+            <div class="tab-content" id="tab-dut-config">
+                <div class="panel">
+                    <h2>🔧 DUT Profile Configuration</h2>
+                    <div class="btn-row" style="margin-bottom:1rem;margin-top:0">
+                        <select id="load-profile-select" style="flex:1">
+                            <option value="">— Load existing profile —</option>
+                        </select>
+                        <button class="btn btn-ghost" onclick="loadProfile()">Load</button>
+                    </div>
+                    <form id="dut-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>DUT / ECU Name *</label>
+                                <input type="text" id="dut-name" placeholder="e.g. MY_ECU_4PORT" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Model / Part Number</label>
+                                <input type="text" id="dut-model" placeholder="e.g. SPC5744P">
+                            </div>
+                            <div class="form-group">
+                                <label>Firmware Version</label>
+                                <input type="text" id="dut-firmware" value="unknown">
+                            </div>
+                            <div class="form-group">
+                                <label>Port Count</label>
+                                <input type="number" id="dut-ports" value="4" min="2" max="16">
+                            </div>
+                            <div class="form-group">
+                                <label>MAC Table Size</label>
+                                <input type="number" id="dut-mac-table" value="1024" min="64" max="65536">
+                            </div>
+                            <div class="form-group">
+                                <label>MAC Aging Time (sec)</label>
+                                <input type="number" id="dut-aging" value="300" min="10" max="6000">
+                            </div>
+                            <div class="form-group full">
+                                <div class="toggle-row"><input type="checkbox" id="dut-double-tag"><span>Supports Double-Tagging (802.1ad)</span></div>
+                                <div class="toggle-row"><input type="checkbox" id="dut-gptp"><span>Supports gPTP (IEEE 802.1AS)</span></div>
+                                <div class="toggle-row"><input type="checkbox" id="dut-reset"><span>Can power-cycle / reset between tests</span></div>
+                            </div>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn btn-success">💾 Save Profile</button>
+                            <button type="button" class="btn btn-ghost" onclick="clearDutForm()">Clear</button>
+                        </div>
+                    </form>
+                    <div id="dut-status" class="status-msg"></div>
+                </div>
             </div>
 
-            <div class="panel">
-                <h2>📊 Recent Test Runs</h2>
-                <table>
-                    <thead>
-                        <tr><th>Report</th><th>DUT</th><th>Tier</th><th>Pass</th><th>Fail</th><th>Rate</th><th>Date</th></tr>
-                    </thead>
-                    <tbody>
-                        {run_rows}{no_runs_msg}
-                    </tbody>
-                </table>
+            <!-- ═══ Tab 3: Run Tests ═══ -->
+            <div class="tab-content" id="tab-run-tests">
+                <div class="panel">
+                    <h2>🚀 Execute Test Suite</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>DUT Profile</label>
+                            <select id="run-dut-select">
+                                <option value="">— Select a DUT profile —</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Test Tier</label>
+                            <select id="run-tier">
+                                <option value="smoke">🔥 Smoke (~1 hour)</option>
+                                <option value="core">⚙️ Core (~8 hours)</option>
+                                <option value="full">📦 Full (40+ hours)</option>
+                            </select>
+                        </div>
+                        <div class="form-group full">
+                            <label>Sections</label>
+                            <div style="display:flex;flex-wrap:wrap;gap:0.7rem;margin-top:0.3rem">
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.3" checked><span>5.3 VLAN</span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.4" checked><span>5.4 General</span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.5" checked><span>5.5 Address</span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.6" checked><span>5.6 Filter</span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.7" checked><span>5.7 Time</span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.8" checked><span>5.8 QoS</span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.9" checked><span>5.9 Config</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-primary" id="btn-start-test" onclick="startTest()">▶ Start Test</button>
+                        <button class="btn btn-danger" id="btn-cancel-test" onclick="cancelTest()" disabled>⏹ Cancel</button>
+                    </div>
+                </div>
+                <div class="panel" id="run-progress-panel" style="display:none">
+                    <h2>📈 Progress</h2>
+                    <div class="progress-container">
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="run-progress-bar"></div></div>
+                        <div class="progress-text" id="run-progress-text">Waiting…</div>
+                    </div>
+                    <div id="run-result" class="status-msg"></div>
+                </div>
             </div>
 
-            <div class="panel">
-                <h2>🔧 Quick Start</h2>
-                <ol style="padding-left:1.5rem;line-height:2;font-size:0.85rem">
-                    <li>Create a DUT profile in <code style="color:#a78bfa">config/dut_profiles/</code></li>
-                    <li>Run: <code style="color:#a78bfa">python -m src.cli run --dut path/to/profile.yaml --tier smoke</code></li>
-                    <li>View reports in <code style="color:#a78bfa">reports/</code> or at <code style="color:#a78bfa">/api/reports</code></li>
-                </ol>
-                <div class="links">
-                    <a href="/docs">📖 API Docs</a>
-                    <a href="/api/specs">📋 All Specs</a>
-                    <a href="/api/reports">📊 All Reports</a>
-                    <a href="/api/health">💚 Health Check</a>
+            <!-- ═══ Tab 4: Pre-flight Checks ═══ -->
+            <div class="tab-content" id="tab-preflight">
+                <div class="panel">
+                    <h2>🩺 Framework Self-Validation</h2>
+                    <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:0.8rem">
+                        Run internal checks to verify the framework is ready for testing.
+                    </p>
+                    <button class="btn btn-primary" id="btn-preflight" onclick="runPreflight()">🔍 Run Checks</button>
+                    <div id="preflight-list" style="margin-top:0.8rem"></div>
+                    <div id="preflight-summary" class="status-msg" style="margin-top:0.6rem"></div>
+                </div>
+            </div>
+
+            <!-- ═══ Tab 5: Console ═══ -->
+            <div class="tab-content" id="tab-console">
+                <div class="panel">
+                    <h2>📋 Real-Time Console</h2>
+                    <div class="console-toolbar">
+                        <span><span class="ws-dot disconnected" id="log-ws-dot"></span><span id="log-ws-status" style="font-size:0.75rem;color:#94a3b8">Disconnected</span></span>
+                        <select id="log-level-filter" onchange="filterLogs()">
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO" selected>INFO</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                        <button class="btn btn-ghost" onclick="clearConsole()" style="padding:0.3rem 0.7rem;font-size:0.72rem">Clear</button>
+                        <button class="btn btn-ghost" id="btn-log-connect" onclick="connectLogs()" style="padding:0.3rem 0.7rem;font-size:0.72rem">Connect</button>
+                    </div>
+                    <div class="console" id="log-console"></div>
                 </div>
             </div>
         </div>
+
+        <!-- ═══ JavaScript ═══ -->
+        <script>
+        // ── Tab Navigation ──
+        document.querySelectorAll('.tab-btn').forEach(btn => {{
+            btn.addEventListener('click', () => {{
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            }});
+        }});
+
+        // ── DUT Profile Data ──
+        const profiles = {profiles_json};
+        function populateProfileDropdowns() {{
+            const selects = [document.getElementById('load-profile-select'), document.getElementById('run-dut-select')];
+            selects.forEach(sel => {{
+                // Keep first option
+                while (sel.options.length > 1) sel.remove(1);
+                profiles.forEach(p => {{
+                    const opt = document.createElement('option');
+                    opt.value = p.path;
+                    opt.textContent = p.name;
+                    sel.appendChild(opt);
+                }});
+            }});
+        }}
+        populateProfileDropdowns();
+
+        // ── Load Profile ──
+        async function loadProfile() {{
+            const sel = document.getElementById('load-profile-select');
+            const name = sel.options[sel.selectedIndex]?.textContent;
+            if (!name || sel.value === '') return;
+            try {{
+                const res = await fetch('/api/dut-profiles/' + encodeURIComponent(name));
+                if (!res.ok) throw new Error('Profile not found');
+                const json = await res.json();
+                const d = json.data;
+                document.getElementById('dut-name').value = d.name || '';
+                document.getElementById('dut-model').value = d.model || '';
+                document.getElementById('dut-firmware').value = d.firmware_version || 'unknown';
+                document.getElementById('dut-ports').value = d.port_count || 4;
+                document.getElementById('dut-mac-table').value = d.max_mac_table_size || 1024;
+                document.getElementById('dut-aging').value = d.mac_aging_time_s || 300;
+                document.getElementById('dut-double-tag').checked = d.supports_double_tagging || false;
+                document.getElementById('dut-gptp').checked = d.supports_gptp || false;
+                document.getElementById('dut-reset').checked = d.can_reset || false;
+                showStatus('dut-status', 'success', 'Loaded: ' + d.name);
+            }} catch (e) {{
+                showStatus('dut-status', 'error', 'Failed: ' + e.message);
+            }}
+        }}
+
+        // ── Save Profile ──
+        document.getElementById('dut-form').addEventListener('submit', async (e) => {{
+            e.preventDefault();
+            const body = {{
+                dut_name: document.getElementById('dut-name').value,
+                model: document.getElementById('dut-model').value,
+                firmware: document.getElementById('dut-firmware').value,
+                port_count: parseInt(document.getElementById('dut-ports').value),
+                mac_table_size: parseInt(document.getElementById('dut-mac-table').value),
+                mac_aging_time: parseInt(document.getElementById('dut-aging').value),
+                double_tagging: document.getElementById('dut-double-tag').checked,
+                gptp: document.getElementById('dut-gptp').checked,
+                can_reset: document.getElementById('dut-reset').checked,
+            }};
+            try {{
+                const res = await fetch('/api/dut-profiles', {{
+                    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify(body),
+                }});
+                const json = await res.json();
+                if (res.ok) {{
+                    showStatus('dut-status', 'success', '✅ Profile saved: ' + json.name);
+                    // Add to dropdowns
+                    profiles.push({{ name: json.name, path: json.name + '.yaml' }});
+                    populateProfileDropdowns();
+                }} else {{
+                    showStatus('dut-status', 'error', '❌ ' + (json.detail || 'Error'));
+                }}
+            }} catch (e) {{
+                showStatus('dut-status', 'error', '❌ ' + e.message);
+            }}
+        }});
+
+        function clearDutForm() {{
+            document.getElementById('dut-form').reset();
+            document.getElementById('dut-status').className = 'status-msg';
+        }}
+
+        // ── Run Tests ──
+        let progressWs = null;
+
+        async function startTest() {{
+            const dutPath = document.getElementById('run-dut-select').value;
+            if (!dutPath) {{ alert('Select a DUT profile first'); return; }}
+
+            const tier = document.getElementById('run-tier').value;
+            const sections = Array.from(document.querySelectorAll('.run-section:checked')).map(c => c.value);
+
+            document.getElementById('btn-start-test').disabled = true;
+            document.getElementById('btn-cancel-test').disabled = false;
+            document.getElementById('run-progress-panel').style.display = 'block';
+            document.getElementById('run-progress-bar').style.width = '0%';
+            document.getElementById('run-progress-text').textContent = 'Starting…';
+            document.getElementById('run-result').className = 'status-msg';
+
+            // Connect progress WebSocket
+            const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            progressWs = new WebSocket(wsProto + '//' + location.host + '/ws/progress');
+            progressWs.onmessage = (ev) => {{
+                const msg = JSON.parse(ev.data);
+                if (msg.type === 'progress') {{
+                    const pct = Math.round((msg.current / msg.total) * 100);
+                    document.getElementById('run-progress-bar').style.width = pct + '%';
+                    const icon = {{ pass: '✅', fail: '❌', informational: 'ℹ️', skip: '⏭️', error: '💥' }}[msg.status] || '🔄';
+                    document.getElementById('run-progress-text').textContent = icon + ' [' + msg.current + '/' + msg.total + '] ' + msg.case_id;
+                }}
+            }};
+
+            try {{
+                const profileDir = 'config/dut_profiles/';
+                const res = await fetch('/api/run', {{
+                    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ dut_profile_path: profileDir + dutPath, tier: tier, sections: sections.length ? sections : null }}),
+                }});
+                const json = await res.json();
+                if (res.ok) {{
+                    document.getElementById('run-progress-bar').style.width = '100%';
+                    showStatus('run-result', 'success',
+                        '✅ Complete — ' + json.passed + ' passed, ' + json.failed + ' failed, ' +
+                        json.pass_rate.toFixed(1) + '% pass rate (' + json.duration_s.toFixed(1) + 's) — ' +
+                        '<a href="/api/reports/' + json.report_id + '/html" style="color:#22c55e">View Report</a>'
+                    );
+                }} else {{
+                    showStatus('run-result', 'error', '❌ ' + (json.detail || 'Error running suite'));
+                }}
+            }} catch (e) {{
+                showStatus('run-result', 'error', '❌ ' + e.message);
+            }} finally {{
+                document.getElementById('btn-start-test').disabled = false;
+                document.getElementById('btn-cancel-test').disabled = true;
+                if (progressWs) progressWs.close();
+            }}
+        }}
+
+        async function cancelTest() {{
+            try {{
+                await fetch('/api/cancel', {{ method: 'POST' }});
+                document.getElementById('run-progress-text').textContent = '⏹ Cancellation requested…';
+            }} catch (e) {{ /* ignore */ }}
+        }}
+
+        // ── Pre-flight ──
+        async function runPreflight() {{
+            const btn = document.getElementById('btn-preflight');
+            const list = document.getElementById('preflight-list');
+            const summary = document.getElementById('preflight-summary');
+            btn.disabled = true;
+            btn.textContent = '⏳ Running…';
+            list.innerHTML = '';
+            summary.className = 'status-msg';
+
+            try {{
+                const res = await fetch('/api/preflight', {{ method: 'POST' }});
+                const json = await res.json();
+                json.checks.forEach(c => {{
+                    const div = document.createElement('div');
+                    div.className = 'check-item ' + c.status;
+                    div.innerHTML = '<span class="check-icon">' + (c.status === 'pass' ? '✅' : '❌') + '</span>'
+                        + '<span>' + c.name + '</span>'
+                        + '<span class="check-detail">' + c.detail + '</span>';
+                    list.appendChild(div);
+                }});
+                const ok = json.passed === json.total;
+                showStatus('preflight-summary', ok ? 'success' : 'error',
+                    (ok ? '✅' : '⚠️') + ' ' + json.passed + '/' + json.total + ' checks passed');
+            }} catch (e) {{
+                showStatus('preflight-summary', 'error', '❌ ' + e.message);
+            }} finally {{
+                btn.disabled = false;
+                btn.textContent = '🔍 Run Checks';
+            }}
+        }}
+
+        // ── Console / Log Streaming ──
+        let logWs = null;
+        const logLines = [];
+        const LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'];
+
+        function connectLogs() {{
+            if (logWs && logWs.readyState <= 1) {{ logWs.close(); return; }}
+            const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            logWs = new WebSocket(wsProto + '//' + location.host + '/ws/logs');
+            logWs.onopen = () => {{
+                document.getElementById('log-ws-dot').className = 'ws-dot connected';
+                document.getElementById('log-ws-status').textContent = 'Connected';
+                document.getElementById('btn-log-connect').textContent = 'Disconnect';
+            }};
+            logWs.onclose = () => {{
+                document.getElementById('log-ws-dot').className = 'ws-dot disconnected';
+                document.getElementById('log-ws-status').textContent = 'Disconnected';
+                document.getElementById('btn-log-connect').textContent = 'Connect';
+            }};
+            logWs.onmessage = (ev) => {{
+                const msg = JSON.parse(ev.data);
+                if (msg.type === 'log') {{
+                    logLines.push(msg);
+                    appendLogLine(msg);
+                }}
+            }};
+        }}
+
+        function appendLogLine(msg) {{
+            const filter = document.getElementById('log-level-filter').value;
+            if (LOG_LEVELS.indexOf(msg.level) < LOG_LEVELS.indexOf(filter)) return;
+            const el = document.getElementById('log-console');
+            const line = document.createElement('div');
+            line.className = 'log-line log-' + msg.level;
+            line.textContent = msg.message;
+            el.appendChild(line);
+            el.scrollTop = el.scrollHeight;
+        }}
+
+        function filterLogs() {{
+            const el = document.getElementById('log-console');
+            el.innerHTML = '';
+            logLines.forEach(msg => appendLogLine(msg));
+        }}
+
+        function clearConsole() {{
+            document.getElementById('log-console').innerHTML = '';
+            logLines.length = 0;
+        }}
+
+        // ── Helpers ──
+        function showStatus(id, type, html) {{
+            const el = document.getElementById(id);
+            el.className = 'status-msg ' + type;
+            el.innerHTML = html;
+        }}
+
+        // Auto-connect console when switching to that tab
+        document.querySelector('[data-tab="console"]').addEventListener('click', () => {{
+            if (!logWs || logWs.readyState > 1) connectLogs();
+        }});
+        </script>
     </body>
     </html>
     """
