@@ -653,16 +653,7 @@ gantt
     Self-validation suite             :p4c, after p4a, 2d
 ```
 
-### 8.2 Phase Details
-
-| Phase | Duration | Deliverables | Priority |
-|---|---|---|---|
-| **Phase 1: Foundation** | Week 1–2 | Project setup, core engine, frame builder, DUT interface, web scaffold | 🔴 Critical |
-| **Phase 2: Priority Test Suites** | Week 3–5 | 5.4 General (10), 5.5 Address Learning (21), 5.3 VLAN (21) — 52 specs | 🔴 Critical |
-| **Phase 3: Extended Test Suites** | Week 6–7 | 5.6 Filtering (11), 5.8 QoS (4), 5.9 Config (3), 5.7 Time Sync (1) — 19 specs | 🟡 High |
-| **Phase 4: Integration & Docs** | Week 8–10 | Integration tests, documentation, self-validation, CI/CD pipeline | 🟡 High |
-
-### 8.3 Test Suite Priority Rationale
+### 8.2 Test Suite Priority Rationale
 
 | Priority | Specs | Rationale |
 |---|---|---|
