@@ -702,21 +702,18 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
-## 10. Open Questions for Stakeholders
+## 10. Resolved Questions & Implementation Decisions
 
-> [!IMPORTANT]
-> The following questions must be resolved before implementation begins. Answers will significantly impact architecture decisions.
-
-| # | Question | Impact | Options |
+| # | Question | Impact | Resolution / Implementation Decision |
 |---|---|---|---|
-| Q1 | **Do you have physical access to the DUT Ethernet ports?** Or is this for simulation/planning only? | Determines if we build for real hardware or simulation first | A) Physical DUT available → real interface; B) Planning only → mock DUT first |
-| Q2 | **How precise do timing measurements need to be?** ±1ms? ±10ms? ±100ms? | Technology choice — Python only vs. C extension vs. hardware timestamping | A) ±10ms (Python OK); B) ±1ms (NIC timestamps); C) ±1µs (hardware required) |
-| Q3 | **How often will the full test suite run?** Daily? Weekly? Per firmware release? | Infrastructure sizing, test tier design | A) Daily (need 1-hour smoke tier); B) Weekly (8-hour core tier); C) Per release (40+ hour full) |
-| Q4 | **Can the DUT be power-cycled or reset between tests?** | Critical for state isolation strategy | A) Yes → full reset between tests; B) No → must wait for natural aging |
-| Q5 | **Does the DUT support simultaneous traffic on multiple ports?** | Determines if parallel test execution is feasible | A) Yes → parallel execution; B) No → sequential only |
-| Q6 | **Any existing test tools/scripts to integrate with or replace?** | Avoid duplication, leverage existing work | A) None; B) Existing scripts → import; C) Existing tools → interface |
-| Q7 | **What NIC hardware is available?** Standard Ethernet? 100BASE-T1 adapters? | Interface implementation priority | A) Standard NICs + media converters; B) Automotive PHY NICs |
-| Q8 | **Target OS for test station?** Linux (recommended), Windows, or both? | Socket implementation, timing precision | A) Linux only; B) Windows only; C) Both (more development effort) |
+| Q1 | **Physical vs. Simulation** | Interface Design | **Hybrid Architecture** — Implemented modular interfaces supporting both physical hardware (Scapy) and simulation (`NullDUTController`). |
+| Q2 | **Timing Precision** | Tech Choice | **±10ms (Software-based)** — Adequate for L2 logic (VLAN, filtering). §5.7 (Time Sync) noted as requiring hardware/C-extension for sub-ms precision. |
+| Q3 | **Execution Frequency** | Tier Design | **Tiered Execution** — Implemented Smoke (~1h), Core (~8h), and Full (~40h) tiers to support both dev-cycles and pre-release regression. |
+| Q4 | **Power-cycle / Reset** | State Isolation | **Natural Aging** — Implemented aging-wait logic in `SessionManager` to clear MAC tables without requiring DUT reboots. |
+| Q5 | **Simultaneous Traffic** | Runner Logic | **Sequential Delivery** — Current architecture ensures clean state isolation per test case. Parallel port testing identified as a future optimization. |
+| Q6 | **Existing Tools** | Integration | **Standalone Python** — Built as a transparent, open-architecture system using Scapy to replace opaque vendor-locked tools. |
+| Q7 | **NIC Hardware** | Interface Priority | **Standard Ethernet** — Support via Linux `AF_PACKET` and Windows Npcap. Automotive 100BASE-T1 handled via media converters. |
+| Q8 | **Target OS** | OS Support | **Cross-platform** — Automated setup scripts and verified compatibility for both Windows and Linux environments. |
 
 ---
 
@@ -751,6 +748,29 @@ Before testing any DUT, the framework must validate itself:
 | **DoIP** | Diagnostics over Internet Protocol |
 | **TSN** | Time-Sensitive Networking (IEEE 802.1) |
 | **WRR** | Weighted Round Robin — QoS scheduling algorithm |
+
+---
+
+## 13. Next Steps
+
+- **Parallel Execution**: Develop async runner architecture enhancements to support simultaneous traffic on multiple ports for reduced execution time.
+- **Hardware Interface Expansion**: Implement specialized plugins for direct automotive PHY (100BASE-T1), DoIP (ISO 13400), and USB-Ethernet adapter support.
+- **Advanced Timing Calibration**: Create a dedicated precision calibration tool for sub-ms timing analysis and Section 5.7 (Time Synchronization) conformance.
+- **Reporting & Compliance**: Expand `ReportGenerator` to support PDF (WeasyPrint), CSV audit logs, and JUnit XML for seamless CI/CD integration.
+- **Web UI Configuration Wizard**: Implement a dynamic, step-by-step ECU configuration wizard in the web dashboard based on the TC8 questionnaire.
+- **Enhanced Observability**: Integrate structured JSON logging and telemetry for long-running (40h+) test suites with progress tracking and automatic failure notification.
+
+---
+
+## 14. Systemic Findings (Independent Inspection)
+
+| Area | Observation / Potential Issue | Impact |
+| --- | --- | --- |
+| **Correctness** | **Hardcoded Double-Tagging TPID**: In `ScapyInterface`, the outer TPID for Q-in-Q is fixed to `0x88A8`. | Some legacy tests requiring `0x9100` or custom TPIDs may fail without a manual override. |
+| **Completeness** | **VLAN Handler Delegation**: Several VLAN specs (011-016) redirect to a generic membership handler. | Relies entirely on YAML `expected_result` for validation; spec-specific ingress logic might be missing. |
+| **Responsiveness** | **Test Abort Latency**: Cancellation only occurs between test cases. | If a test is in a 2-second capture window, there is a delay before the framework stops. |
+| **Reliability** | **SQLite Windows File Locking**: Standard production config uses a local `.db` file. | Simultaneous access from CLI and Web UI on Windows could potentially cause locking issues. |
+| **Validation** | **Software-only Timing**: Conformance for §5.7 (Time Sync) is software-limited (±10ms). | Cannot guarantee 1µs precision requirements without hardware assistance (as noted in PRD). |
 
 ---
 

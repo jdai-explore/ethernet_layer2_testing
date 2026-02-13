@@ -155,8 +155,11 @@ class ConfigManager:
     def load_dut_profile(self, profile_path: Path | str) -> DUTProfile:
         """Load a DUT configuration profile from YAML."""
         path = Path(profile_path)
-        if not path.is_absolute():
+        
+        # If path doesn't exist as-is and is not absolute, try relative to dut_profiles/
+        if not path.is_absolute() and not path.exists():
             path = self.config_dir / "dut_profiles" / path
+            
         raw = self._load_yaml(path)
         ports = [PortConfig(**p) for p in raw.pop("ports", [])]
         self._dut_profile = DUTProfile(ports=ports, **raw)
