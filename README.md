@@ -165,17 +165,14 @@ python -m pytest tests/ --cov=src --cov-report=html
 
 ## 📄 License
 
-MIT License — see [LICENSE](LICENSE) file for details.
+Proprietary License
 
-## 🤝 Contributing
-
-Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📧 Support
 
 - **Issues**: [GitHub Issues](https://github.com/your-org/tc8-l2-test-framework/issues)
 - **Documentation**: [User Guide](docs/user_guide.md)
-- **Email**: tc8-support@your-org.com
+- **Email**: 
 
 ---
 
