@@ -1,0 +1,58 @@
+# Simulation DUT Profile
+# For framework testing without physical hardware
+
+name: "Simulation-DUT-NullController"
+model: "SIM-4P"
+firmware_version: "v0.0.0-sim"
+port_count: 4
+
+ports:
+  - port_id: 0
+    interface_name: "sim0"
+    mac_address: "02:00:00:00:00:00"
+    speed_mbps: 100
+    vlan_membership: [1, 100, 200]
+    pvid: 1
+    is_trunk: false
+    
+  - port_id: 1
+    interface_name: "sim1"
+    mac_address: "02:00:00:00:00:01"
+    speed_mbps: 100
+    vlan_membership: [1, 100, 200]
+    pvid: 1
+    is_trunk: true
+    
+  - port_id: 2
+    interface_name: "sim2"
+    mac_address: "02:00:00:00:00:02"
+    speed_mbps: 100
+    vlan_membership: [100]
+    pvid: 100
+    is_trunk: false
+    
+  - port_id: 3
+    interface_name: "sim3"
+    mac_address: "02:00:00:00:00:03"
+    speed_mbps: 100
+    vlan_membership: [200]
+    pvid: 200
+    is_trunk: false
+
+supported_features:
+  - vlan
+  - address_learning
+  - filtering
+  - qos
+  - configuration
+
+max_mac_table_size: 1024
+mac_aging_time_s: 300
+supports_double_tagging: false
+supports_gptp: false
+can_reset: false
+
+notes: |
+  Simulation DUT for framework testing.
+  Uses NullDUTController - no actual hardware required.
+  All tests will pass/fail based on framework logic only.

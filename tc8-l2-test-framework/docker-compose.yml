@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Web UI and API server
+  tc8-web:
+    build: .
+    container_name: tc8-web
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount config for DUT profiles
+      - ./config:/app/config:ro
+      # Mount reports directory for output
+      - ./reports:/app/reports
+      # Mount logs directory
+      - ./logs:/app/logs
+    environment:
+      - TC8_DB_URL=sqlite:////app/data/tc8_results.db
+      - TC8_LOG_LEVEL=INFO
+    networks:
+      - tc8-network
+    # Use host network for DUT access (Linux only)
+    # network_mode: host  # Uncomment for direct DUT access
+    restart: unless-stopped
+
+  # Optional: PostgreSQL for production persistence
+  tc8-db:
+    image: postgres:15-alpine
+    container_name: tc8-db
+    environment:
+      - POSTGRES_DB=tc8_results
+      - POSTGRES_USER=tc8user
+      - POSTGRES_PASSWORD=tc8pass
+    volumes:
+      - tc8-db-data:/var/lib/postgresql/data
+    networks:
+      - tc8-network
+    restart: unless-stopped
+    # Uncomment to use PostgreSQL instead of SQLite
+    # profiles: ["production"]
+
+networks:
+  tc8-network:
+    driver: bridge
+
+volumes:
+  tc8-db-data:
+
+# Usage:
+# 
+# Start services:
+#   docker-compose up -d
+#
+# View logs:
+#   docker-compose logs -f tc8-web
+#
+# Run CLI command:
+#   docker-compose exec tc8-web python -m src.cli specs
+#
+# Stop services:
+#   docker-compose down
+#
+# With PostgreSQL (production):
+#   docker-compose --profile production up -d

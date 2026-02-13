@@ -1,0 +1,57 @@
+# 4-Port Basic Switch
+# Typical entry-level automotive ECU with basic VLAN support
+
+name: "4Port-Basic-Switch"
+model: "ECU-SW-4P-100"
+firmware_version: "v1.0.0"
+port_count: 4
+
+ports:
+  # All ports in VLAN 1, access mode
+  - port_id: 0
+    interface_name: "eth0"  # Update with your interface
+    mac_address: "02:00:00:00:00:00"
+    speed_mbps: 100
+    vlan_membership: [1]
+    pvid: 1
+    is_trunk: false
+    
+  - port_id: 1
+    interface_name: "eth1"
+    mac_address: "02:00:00:00:00:01"
+    speed_mbps: 100
+    vlan_membership: [1]
+    pvid: 1
+    is_trunk: false
+    
+  - port_id: 2
+    interface_name: "eth2"
+    mac_address: "02:00:00:00:00:02"
+    speed_mbps: 100
+    vlan_membership: [1]
+    pvid: 1
+    is_trunk: false
+    
+  - port_id: 3
+    interface_name: "eth3"
+    mac_address: "02:00:00:00:00:03"
+    speed_mbps: 100
+    vlan_membership: [1]
+    pvid: 1
+    is_trunk: false
+
+supported_features:
+  - vlan
+  - address_learning
+  - filtering
+
+max_mac_table_size: 512
+mac_aging_time_s: 300
+supports_double_tagging: false
+supports_gptp: false
+can_reset: false
+
+notes: |
+  Basic 4-port switch with minimal VLAN support.
+  All ports in single VLAN (access mode).
+  Suitable for simple network topologies.
