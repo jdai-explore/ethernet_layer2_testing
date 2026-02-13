@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "tc8-l2-test-framework"
+version = "0.1.0"
+description = "OPEN Alliance TC8 Layer 2 Automotive Ethernet ECU Test Framework"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "TC8-L2 Test Framework Team"}
+]
+keywords = ["automotive", "ethernet", "TC8", "OPEN Alliance", "Layer2", "VLAN", "ECU", "testing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "scapy>=2.5.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "jinja2>=3.1.0",
+    "sqlalchemy>=2.0.0",
+    "psutil>=5.9.0",
+    "rich>=13.0.0",
+    "click>=8.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "httpx>=0.24",
+    "ruff>=0.1.0",
+    "mypy>=1.5",
+]
+reports = [
+    "weasyprint>=60.0",
+    "matplotlib>=3.7",
+]
+
+[project.scripts]
+tc8-run = "src.core.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "smoke: Quick validation tests (< 1 hour)",
+    "core: Core functionality tests (< 8 hours)",
+    "full: Full regression tests (40+ hours)",
+    "timing_sensitive: Tests requiring precise timing",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.10"
+strict = true

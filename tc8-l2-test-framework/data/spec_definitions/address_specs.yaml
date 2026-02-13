@@ -1,0 +1,166 @@
+# TC8 Layer 2 v3.0 — Section 5.5 Address Learning Specifications (Representative Set)
+# Data-driven definitions — first 10 of 21 specs shown
+
+SWITCH_ADDR_001:
+  tc8_reference: "5.5.1"
+  title: "Source MAC Learning"
+  description: "Verify switch learns source MAC address and associates it with the ingress port"
+  priority: high
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "MAC address table cleared"
+  test_procedure:
+    - "Send frame with unique source MAC on port X"
+    - "Send frame with that MAC as destination on another port"
+    - "Verify frame forwarded only to port X (unicast, not flooded)"
+  expected_result:
+    forward_to: "learned_port"
+    strict_forwarding: true
+
+SWITCH_ADDR_002:
+  tc8_reference: "5.5.2"
+  title: "MAC Learning — Multiple Ports"
+  description: "Verify switch maintains MAC-to-port bindings for multiple addresses across different ports"
+  priority: high
+  parameters:
+    vid_range: [1, 100]
+    mac_count: 10
+  preconditions:
+    - "MAC address table cleared"
+  test_procedure:
+    - "Learn different MAC addresses on each port"
+    - "Send frames to each learned MAC"
+    - "Verify each frame goes to correct port"
+  expected_result:
+    forward_to: "learned_port"
+
+SWITCH_ADDR_003:
+  tc8_reference: "5.5.3"
+  title: "MAC Learning — Port Migration"
+  description: "Verify switch updates MAC entry when a host moves to a different port"
+  priority: high
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "MAC address learned on port A"
+  test_procedure:
+    - "Learn MAC on port A"
+    - "Send frame with same source MAC on port B"
+    - "Verify MAC entry updated to port B"
+    - "Send frame to that MAC — verify forwarded to port B"
+  expected_result:
+    forward_to: "learned_port"
+    port_migration: true
+
+SWITCH_ADDR_004:
+  tc8_reference: "5.5.4"
+  title: "Unknown Destination Flooding"
+  description: "Verify frames with unknown destination MAC are flooded to all ports in VLAN"
+  priority: high
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "MAC address table cleared or destination MAC not learned"
+  test_procedure:
+    - "Send frame with unknown destination MAC"
+    - "Verify frame flooded to all VLAN member ports"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_ADDR_005:
+  tc8_reference: "5.5.5"
+  title: "MAC Table Capacity"
+  description: "Verify switch handles MAC table at capacity — new entries either replace oldest or cause flooding"
+  priority: medium
+  parameters:
+    mac_count_range: [1, 2048]
+  preconditions:
+    - "MAC address table cleared"
+  test_procedure:
+    - "Learn MAC addresses until table capacity reached"
+    - "Attempt to learn one more MAC"
+    - "Verify behavior (replace oldest or flood)"
+  expected_result:
+    behavior: "implementation_defined"
+
+SWITCH_ADDR_006:
+  tc8_reference: "5.5.6"
+  title: "MAC Aging — Entry Timeout"
+  description: "Verify learned MAC entries age out after the configured aging time"
+  priority: high
+  timing_tier: tier_b
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "MAC aging time known (from DUT profile)"
+  test_procedure:
+    - "Learn MAC on port X"
+    - "Wait for aging timeout"
+    - "Send frame to that MAC"
+    - "Verify frame is flooded (entry aged out)"
+  expected_result:
+    forward_to: "member_ports_only"
+    entry_aged: true
+
+SWITCH_ADDR_007:
+  tc8_reference: "5.5.7"
+  title: "MAC Aging — Refresh on Activity"
+  description: "Verify MAC aging timer resets when traffic is received from the learned source"
+  priority: high
+  timing_tier: tier_b
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "MAC aging time known"
+  test_procedure:
+    - "Learn MAC on port X"
+    - "Wait for 80% of aging time"
+    - "Send another frame from same source MAC on port X"
+    - "Wait for 80% of aging time again"
+    - "Send frame to that MAC — verify unicast (timer was refreshed)"
+  expected_result:
+    forward_to: "learned_port"
+    entry_refreshed: true
+
+SWITCH_ADDR_008:
+  tc8_reference: "5.5.8"
+  title: "Static MAC Entry"
+  description: "Verify statically configured MAC entries are not subject to aging"
+  priority: medium
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "DUT supports static MAC entries"
+    - "Static MAC configured on DUT"
+  test_procedure:
+    - "Configure static MAC entry for port X"
+    - "Wait for aging timeout"
+    - "Send frame to that MAC — verify still forwarded to port X"
+  expected_result:
+    forward_to: "learned_port"
+    no_aging: true
+
+SWITCH_ADDR_009:
+  tc8_reference: "5.5.9"
+  title: "Broadcast Source MAC"
+  description: "Verify switch does not learn broadcast MAC as source address"
+  priority: medium
+  parameters: {}
+  test_procedure:
+    - "Send frame with source MAC = FF:FF:FF:FF:FF:FF"
+    - "Verify switch does not create MAC table entry for broadcast address"
+  expected_result:
+    no_learning: true
+
+SWITCH_ADDR_010:
+  tc8_reference: "5.5.10"
+  title: "Multicast Source MAC"
+  description: "Verify switch does not learn multicast MAC addresses as source"
+  priority: medium
+  parameters: {}
+  test_procedure:
+    - "Send frame with multicast source MAC (bit 0 of first octet = 1)"
+    - "Verify switch does not learn this address"
+  expected_result:
+    no_learning: true

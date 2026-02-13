@@ -1,0 +1,206 @@
+# TC8 Layer 2 v3.0 — Section 5.6 Filtering Specifications (Representative Set)
+
+SWITCH_FILT_001:
+  tc8_reference: "5.6.1"
+  title: "Static MAC Filtering — Block"
+  description: "Verify frames with filtered destination MAC are dropped"
+  priority: medium
+  parameters:
+    vid_range: [1, 100]
+  preconditions:
+    - "Static filter entry configured on DUT"
+  test_procedure:
+    - "Send frame with destination MAC that matches a filter rule"
+    - "Verify frame is dropped on filtered port(s)"
+  expected_result:
+    tag_action: "drop"
+
+SWITCH_FILT_002:
+  tc8_reference: "5.6.2"
+  title: "Static MAC Filtering — Allow"
+  description: "Verify frames with allowed destination MAC are forwarded normally"
+  priority: medium
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Send frame with destination MAC not in any filter"
+    - "Verify normal forwarding behavior"
+  expected_result:
+    forward_to: "learned_port"
+
+SWITCH_FILT_003:
+  tc8_reference: "5.6.3"
+  title: "Multicast Filtering"
+  description: "Verify multicast frames are filtered based on multicast group configuration"
+  priority: medium
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Configure multicast group filtering"
+    - "Send multicast frame to filtered group"
+    - "Verify frame forwarded only to registered ports"
+  expected_result:
+    forward_to: "registered_ports"
+
+SWITCH_FILT_004:
+  tc8_reference: "5.6.4"
+  title: "Broadcast Storm Control"
+  description: "Verify switch limits broadcast traffic rate under storm conditions"
+  priority: medium
+  timing_tier: tier_b
+  parameters:
+    rates_pps: [100, 1000, 10000]
+  test_procedure:
+    - "Send broadcast frames at increasing rates"
+    - "Verify rate limiting engages at configured threshold"
+    - "Measure actual forwarded rate"
+  expected_result:
+    rate_limited: true
+
+SWITCH_FILT_005:
+  tc8_reference: "5.6.5"
+  title: "Unknown Unicast Storm Control"
+  description: "Verify switch limits unknown unicast flooding under storm conditions"
+  priority: medium
+  timing_tier: tier_b
+  parameters:
+    rates_pps: [100, 1000, 10000]
+  test_procedure:
+    - "Send frames with unknown destination at increasing rates"
+    - "Verify flooding is rate limited"
+  expected_result:
+    rate_limited: true
+
+---
+# TC8 Layer 2 v3.0 — Section 5.7 Time Synchronization
+
+SWITCH_TIME_001:
+  tc8_reference: "5.7.1"
+  title: "gPTP Residence Time Correction"
+  description: "Verify switch correctly applies residence time correction to gPTP (IEEE 802.1AS) Sync messages"
+  priority: low
+  timing_tier: tier_c
+  parameters: {}
+  preconditions:
+    - "DUT supports gPTP"
+    - "gPTP is enabled on all test ports"
+  test_procedure:
+    - "Send gPTP Sync message on ingress port"
+    - "Capture on egress port"
+    - "Verify correctionField updated with switch residence time"
+  expected_result:
+    residence_time_corrected: true
+    max_residence_time_ns: 1000
+
+---
+# TC8 Layer 2 v3.0 — Section 5.8 QoS Specifications
+
+SWITCH_QOS_001:
+  tc8_reference: "5.8.1"
+  title: "PCP to Queue Mapping"
+  description: "Verify switch maps IEEE 802.1Q Priority Code Point (PCP) to internal queues correctly"
+  priority: medium
+  parameters:
+    pcp_values: [0, 1, 2, 3, 4, 5, 6, 7]
+    vid_range: [1, 100]
+  test_procedure:
+    - "Send frames with different PCP values"
+    - "Verify higher PCP frames are prioritized under congestion"
+  expected_result:
+    priority_maintained: true
+
+SWITCH_QOS_002:
+  tc8_reference: "5.8.2"
+  title: "Strict Priority Scheduling"
+  description: "Verify strict priority scheduling — higher priority queues always served first"
+  priority: medium
+  timing_tier: tier_b
+  parameters:
+    pcp_values: [0, 7]
+  preconditions:
+    - "DUT uses strict priority scheduling"
+  test_procedure:
+    - "Send mixed priority traffic to saturate egress port"
+    - "Verify high-priority frames forwarded first"
+    - "Measure latency difference between priorities"
+  expected_result:
+    high_priority_first: true
+
+SWITCH_QOS_003:
+  tc8_reference: "5.8.3"
+  title: "PCP Preservation"
+  description: "Verify switch preserves PCP value from ingress to egress"
+  priority: medium
+  parameters:
+    pcp_values: [0, 1, 2, 3, 4, 5, 6, 7]
+    vid_range: [1, 100]
+  test_procedure:
+    - "Send tagged frames with each PCP value"
+    - "Verify PCP value unchanged on egress"
+  expected_result:
+    pcp_preserved: true
+
+SWITCH_QOS_004:
+  tc8_reference: "5.8.4"
+  title: "Default PCP Assignment"
+  description: "Verify switch assigns correct default PCP to untagged ingress frames"
+  priority: low
+  parameters:
+    vid_range: [1, 100]
+  test_procedure:
+    - "Send untagged frame on access port"
+    - "Verify PCP of tagged frame on trunk egress matches configured default"
+  expected_result:
+    pcp_assigned: true
+
+---
+# TC8 Layer 2 v3.0 — Section 5.9 Configuration
+
+SWITCH_CFG_001:
+  tc8_reference: "5.9.1"
+  title: "Default Configuration"
+  description: "Verify switch operates with correct default configuration after factory reset"
+  priority: low
+  parameters: {}
+  preconditions:
+    - "DUT factory reset performed"
+  test_procedure:
+    - "Power on DUT in factory default state"
+    - "Verify VLAN membership matches defaults"
+    - "Verify MAC aging time matches defaults"
+    - "Verify frame forwarding operates correctly"
+  expected_result:
+    default_config_valid: true
+
+SWITCH_CFG_002:
+  tc8_reference: "5.9.2"
+  title: "Configuration Persistence Across Power Cycle"
+  description: "Verify switch configuration persists across power cycles"
+  priority: low
+  parameters: {}
+  preconditions:
+    - "DUT configured with non-default settings"
+    - "DUT can be power-cycled"
+  test_procedure:
+    - "Configure specific VLAN memberships and settings"
+    - "Power cycle DUT"
+    - "Verify configuration restored after reboot"
+  expected_result:
+    config_persisted: true
+
+SWITCH_CFG_003:
+  tc8_reference: "5.9.3"
+  title: "Configuration Interface (AUTOSAR Testability)"
+  description: "Verify switch configuration can be read/modified via AUTOSAR Testability Protocol"
+  priority: low
+  parameters: {}
+  preconditions:
+    - "DUT supports AUTOSAR Testability Protocol"
+  test_procedure:
+    - "Connect to DUT via testability protocol"
+    - "Read current switch configuration"
+    - "Modify a VLAN membership setting"
+    - "Verify change takes effect"
+  expected_result:
+    config_readable: true
+    config_modifiable: true

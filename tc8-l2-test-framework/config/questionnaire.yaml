@@ -1,0 +1,95 @@
+# TC8 L2 Test Framework — ECU Team Questionnaire
+# Fill this out to generate a DUT profile for your ECU.
+
+questionnaire:
+  title: "Automotive Ethernet ECU — Switch Configuration Questionnaire"
+  version: "1.0"
+  description: >
+    This questionnaire captures the switch configuration of your ECU
+    for TC8 Layer 2 conformance testing. Your answers will generate
+    a DUT profile used by the test framework.
+
+  sections:
+    - name: "ECU Identification"
+      questions:
+        - id: dut_name
+          label: "ECU / DUT name"
+          type: text
+          required: true
+          example: "Central Gateway ECU v2.1"
+
+        - id: model
+          label: "ECU model / part number"
+          type: text
+          required: false
+
+        - id: firmware
+          label: "Firmware version"
+          type: text
+          required: true
+
+    - name: "Port Configuration"
+      questions:
+        - id: port_count
+          label: "Number of Ethernet switch ports"
+          type: integer
+          min: 2
+          max: 16
+          required: true
+
+        - id: port_speed
+          label: "Port speed(s)"
+          type: select_multiple
+          options: ["100 Mbps (100BASE-T1)", "1000 Mbps (1000BASE-T1)"]
+
+        - id: port_details
+          label: "Per-port VLAN membership"
+          type: table
+          description: "For each port, list VLAN memberships and trunk/access mode"
+          columns:
+            - "Port ID"
+            - "VLAN Memberships (comma-separated)"
+            - "PVID (default VLAN)"
+            - "Mode (trunk/access)"
+
+    - name: "Switch Features"
+      questions:
+        - id: mac_table_size
+          label: "MAC address table capacity"
+          type: integer
+          default: 1024
+
+        - id: mac_aging_time
+          label: "MAC aging timeout (seconds)"
+          type: integer
+          default: 300
+
+        - id: double_tagging
+          label: "Supports double-tagged frames (802.1ad)?"
+          type: boolean
+          default: false
+
+        - id: gptp
+          label: "Supports gPTP (IEEE 802.1AS)?"
+          type: boolean
+          default: false
+
+    - name: "Test Environment"
+      questions:
+        - id: can_reset
+          label: "Can the DUT be power-cycled between tests?"
+          type: boolean
+          default: false
+
+        - id: reset_command
+          label: "DUT reset command (if applicable)"
+          type: text
+          required: false
+
+        - id: interface_type
+          label: "Test station connectivity"
+          type: select
+          options:
+            - "Direct Ethernet (recommended)"
+            - "USB-Ethernet adapter"
+            - "TCP/IP over network"

@@ -1,0 +1,177 @@
+# TC8 Layer 2 v3.0 — Section 5.4 General Test Specifications
+# Data-driven definitions for all 10 specifications
+
+SWITCH_GEN_001:
+  tc8_reference: "5.4.1"
+  title: "Unicast Frame Forwarding"
+  description: "Verify that the switch correctly forwards unicast frames to the destination port based on MAC address table lookup"
+  priority: high
+  timing_tier: tier_a
+  parameters:
+    vid_range: [1, 4095]
+  preconditions:
+    - "DUT in default operating state"
+    - "MAC address table contains destination MAC entry"
+    - "All links verified UP"
+  test_procedure:
+    - "Learn destination MAC on egress port (send frame from egress)"
+    - "Send unicast frame with known destination MAC on ingress port"
+    - "Verify frame received on correct egress port"
+    - "Verify frame NOT received on other ports"
+  expected_result:
+    forward_to: "learned_port"
+    strict_forwarding: true
+
+SWITCH_GEN_002:
+  tc8_reference: "5.4.2"
+  title: "Broadcast Frame Flooding"
+  description: "Verify that the switch floods broadcast frames to all ports except the ingress port"
+  priority: high
+  timing_tier: tier_a
+  parameters:
+    vid_range: [1, 4095]
+  preconditions:
+    - "DUT in default operating state"
+    - "All links verified UP"
+  test_procedure:
+    - "Send broadcast frame (dst=FF:FF:FF:FF:FF:FF) on ingress port"
+    - "Verify frame received on all other ports (within VLAN)"
+    - "Verify frame NOT received on ingress port"
+  expected_result:
+    forward_to: "all_ports"
+    strict_forwarding: false
+
+SWITCH_GEN_003:
+  tc8_reference: "5.4.3"
+  title: "Multicast Frame Forwarding"
+  description: "Verify that the switch handles multicast frames correctly — flood to all ports in VLAN unless multicast filtering is configured"
+  priority: high
+  timing_tier: tier_a
+  parameters:
+    vid_range: [1, 4095]
+  preconditions:
+    - "DUT in default operating state"
+    - "All links verified UP"
+  test_procedure:
+    - "Send multicast frame (dst=01:xx:xx:xx:xx:xx) on ingress port"
+    - "Verify frame received on appropriate ports"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_GEN_004:
+  tc8_reference: "5.4.4"
+  title: "Unknown Unicast Flooding"
+  description: "Verify that frames with unknown destination MAC are flooded to all ports in the VLAN"
+  priority: high
+  timing_tier: tier_a
+  parameters:
+    vid_range: [1, 4095]
+  preconditions:
+    - "MAC address table cleared"
+    - "All links verified UP"
+  test_procedure:
+    - "Send unicast frame with unknown destination MAC on ingress port"
+    - "Verify frame flooded to all other ports in VLAN"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_GEN_005:
+  tc8_reference: "5.4.5"
+  title: "Minimum Frame Size Handling"
+  description: "Verify switch correctly handles minimum-size Ethernet frames (64 bytes)"
+  priority: medium
+  timing_tier: tier_a
+  parameters:
+    vid_range: [1, 100]
+    payload_size: 64
+  preconditions:
+    - "DUT in default operating state"
+  test_procedure:
+    - "Send minimum-size frame (64 bytes) on ingress port"
+    - "Verify frame forwarded without modification to payload"
+  expected_result:
+    forward_to: "learned_port"
+
+SWITCH_GEN_006:
+  tc8_reference: "5.4.6"
+  title: "Maximum Frame Size Handling"
+  description: "Verify switch correctly handles maximum-size Ethernet frames (1518 bytes standard, 9216 jumbo)"
+  priority: medium
+  timing_tier: tier_a
+  parameters:
+    vid_range: [1, 100]
+    payload_sizes: [1518, 9216]
+  preconditions:
+    - "DUT in default operating state"
+  test_procedure:
+    - "Send maximum-size frame on ingress port"
+    - "Verify frame forwarded without truncation"
+  expected_result:
+    forward_to: "learned_port"
+
+SWITCH_GEN_007:
+  tc8_reference: "5.4.7"
+  title: "Runt Frame Handling"
+  description: "Verify switch correctly drops frames smaller than minimum Ethernet frame size"
+  priority: medium
+  timing_tier: tier_a
+  parameters:
+    payload_sizes: [10, 32, 46, 63]
+  preconditions:
+    - "DUT in default operating state"
+  test_procedure:
+    - "Send undersized frame on ingress port"
+    - "Verify frame is dropped (not forwarded to any port)"
+  expected_result:
+    forward_to: "none"
+    tag_action: "drop"
+
+SWITCH_GEN_008:
+  tc8_reference: "5.4.8"
+  title: "Switch Startup Time"
+  description: "Measure the time from power-on to first frame forwarded"
+  priority: low
+  timing_tier: tier_b
+  parameters: {}
+  preconditions:
+    - "DUT powered off"
+  test_procedure:
+    - "Power on DUT and start timer"
+    - "Continuously send frames on ingress port"
+    - "Record time when first frame is received on egress port"
+  expected_result:
+    timing_measurement: true
+    max_startup_ms: 5000
+
+SWITCH_GEN_009:
+  tc8_reference: "5.4.9"
+  title: "Link Up Event Handling"
+  description: "Verify switch correctly handles port link-up transitions"
+  priority: low
+  timing_tier: tier_a
+  parameters: {}
+  preconditions:
+    - "DUT in operating state with one port link-down"
+  test_procedure:
+    - "Establish link on previously disconnected port"
+    - "Verify port becomes operational within timeout"
+    - "Verify frame forwarding works on newly-up port"
+  expected_result:
+    port_up: true
+
+SWITCH_GEN_010:
+  tc8_reference: "5.4.10"
+  title: "Link Down Event Handling"
+  description: "Verify switch correctly handles port link-down transitions and cleans up related state"
+  priority: low
+  timing_tier: tier_a
+  parameters: {}
+  preconditions:
+    - "DUT in normal operating state with all links UP"
+  test_procedure:
+    - "Disconnect cable on one port"
+    - "Verify MAC entries for that port are removed/aged"
+    - "Verify no frames are forwarded to disconnected port"
+  expected_result:
+    port_down: true
+    mac_entries_removed: true

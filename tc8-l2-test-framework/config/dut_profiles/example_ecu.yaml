@@ -1,0 +1,58 @@
+# Example DUT Profile — 4-Port Automotive ECU
+# Copy and modify for your specific ECU configuration.
+
+name: "Example Central Gateway ECU"
+model: "CGW-4P-100T1"
+firmware_version: "2.1.0-rc3"
+port_count: 4
+
+ports:
+  - port_id: 0
+    interface_name: "eth1"
+    mac_address: "02:00:00:00:00:01"
+    speed_mbps: 100
+    vlan_membership: [1, 10, 20]
+    pvid: 1
+    is_trunk: true
+
+  - port_id: 1
+    interface_name: "eth2"
+    mac_address: "02:00:00:00:00:02"
+    speed_mbps: 100
+    vlan_membership: [1, 10]
+    pvid: 10
+    is_trunk: false
+
+  - port_id: 2
+    interface_name: "eth3"
+    mac_address: "02:00:00:00:00:03"
+    speed_mbps: 100
+    vlan_membership: [1, 20]
+    pvid: 20
+    is_trunk: false
+
+  - port_id: 3
+    interface_name: "eth4"
+    mac_address: "02:00:00:00:00:04"
+    speed_mbps: 100
+    vlan_membership: [1, 10, 20]
+    pvid: 1
+    is_trunk: true
+
+supported_features:
+  - vlan
+  - address_learning
+  - filtering
+  - qos
+  - configuration
+
+max_mac_table_size: 1024
+mac_aging_time_s: 300
+supports_double_tagging: false
+supports_gptp: false
+can_reset: true
+reset_command: "ssh ecu@192.168.1.100 'reboot'"
+notes: >
+  Example profile for a 4-port central gateway ECU.
+  Ports 0 and 3 are trunk ports carrying multiple VLANs.
+  Ports 1 and 2 are access ports with a single default VLAN each.

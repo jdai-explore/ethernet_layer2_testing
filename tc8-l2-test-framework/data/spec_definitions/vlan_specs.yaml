@@ -1,0 +1,155 @@
+# TC8 Layer 2 v3.0 — Section 5.3 VLAN Test Specifications (Representative Set)
+# Data-driven definitions — first 10 of 21 specs shown, extend as needed
+
+SWITCH_VLAN_001:
+  tc8_reference: "5.3.1"
+  title: "VLAN Membership — Tagged Frame Forwarding"
+  description: "Verify tagged frames are forwarded only to ports that are members of the specified VLAN"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+    frame_types: [single_tagged]
+  preconditions:
+    - "DUT ports configured with known VLAN membership"
+    - "MAC address table cleared"
+  test_procedure:
+    - "Send single-tagged frame with VID=X on ingress port"
+    - "Verify frame received on all member ports of VLAN X"
+    - "Verify frame NOT received on non-member ports"
+  expected_result:
+    forward_to: "member_ports_only"
+    strict_forwarding: true
+  timing_tolerance_ms: 100
+
+SWITCH_VLAN_002:
+  tc8_reference: "5.3.2"
+  title: "VLAN Membership — Untagged Frame Handling"
+  description: "Verify untagged frames are assigned to the PVID of the ingress port"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+    frame_types: [untagged]
+  preconditions:
+    - "Ingress port PVID configured"
+  test_procedure:
+    - "Send untagged frame on ingress port"
+    - "Verify frame is associated with ingress port PVID"
+    - "Verify frame forwarded to PVID member ports"
+  expected_result:
+    forward_to: "member_ports_only"
+    tag_action: "as_configured"
+
+SWITCH_VLAN_003:
+  tc8_reference: "5.3.3"
+  title: "VLAN Tag Insertion on Egress"
+  description: "Verify switch inserts VLAN tag on egress for trunk ports"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Send untagged frame on access port"
+    - "Verify tagged frame received on trunk egress port with correct VID"
+  expected_result:
+    tag_action: "tagged"
+
+SWITCH_VLAN_004:
+  tc8_reference: "5.3.4"
+  title: "VLAN Tag Removal on Egress"
+  description: "Verify switch removes VLAN tag on egress for access ports"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Send tagged frame on trunk port"
+    - "Verify untagged frame received on access egress port"
+  expected_result:
+    tag_action: "untagged"
+
+SWITCH_VLAN_005:
+  tc8_reference: "5.3.5"
+  title: "VLAN Tag Preservation"
+  description: "Verify switch preserves VLAN tag (VID, PCP, DEI) on trunk-to-trunk forwarding"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+    pcp_values: [0, 1, 2, 3, 4, 5, 6, 7]
+  test_procedure:
+    - "Send tagged frame with specific VID and PCP on trunk ingress"
+    - "Verify tag preserved on trunk egress"
+  expected_result:
+    tag_action: "tagged"
+    preserve_pcp: true
+
+SWITCH_VLAN_006:
+  tc8_reference: "5.3.6"
+  title: "PVID Assignment"
+  description: "Verify Port VLAN ID (PVID) is correctly assigned to untagged ingress frames"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Configure PVID on ingress port"
+    - "Send untagged frame"
+    - "Verify frame classified into PVID"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_VLAN_007:
+  tc8_reference: "5.3.7"
+  title: "VLAN Filtering — Non-Member Drop"
+  description: "Verify frames with VID for which the ingress port is not a member are dropped"
+  priority: high
+  parameters:
+    vid_range: [1, 4095]
+  test_procedure:
+    - "Send tagged frame with VID for which ingress port is NOT a member"
+    - "Verify frame is dropped (not forwarded)"
+  expected_result:
+    tag_action: "drop"
+
+SWITCH_VLAN_008:
+  tc8_reference: "5.3.8"
+  title: "VLAN ID 0 — Priority Tagged"
+  description: "Verify priority-tagged frames (VID=0) are handled per specification"
+  priority: medium
+  parameters:
+    vid_range: [0, 0]
+    pcp_values: [0, 1, 2, 3, 4, 5, 6, 7]
+  test_procedure:
+    - "Send frame with VID=0 (priority tag only)"
+    - "Verify frame classified into PVID of ingress port"
+  expected_result:
+    forward_to: "member_ports_only"
+
+SWITCH_VLAN_009:
+  tc8_reference: "5.3.9"
+  title: "VLAN ID 4095 — Reserved"
+  description: "Verify frames with reserved VID 4095 are dropped"
+  priority: medium
+  parameters:
+    vid_range: [4095, 4095]
+  test_procedure:
+    - "Send tagged frame with VID=4095"
+    - "Verify frame is dropped"
+  expected_result:
+    tag_action: "drop"
+
+SWITCH_VLAN_010:
+  tc8_reference: "5.3.10"
+  title: "Double-Tagged Frame Handling (802.1ad)"
+  description: "Verify switch correctly handles double-tagged Q-in-Q frames"
+  priority: medium
+  parameters:
+    outer_vid_range: [1, 4094]
+    inner_vid_range: [1, 4094]
+    outer_tpid: 0x88a8
+    inner_tpid: 0x8100
+    frame_types: [double_tagged]
+  preconditions:
+    - "DUT supports double-tagging (802.1ad)"
+  test_procedure:
+    - "Send double-tagged frame with outer S-VLAN and inner C-VLAN"
+    - "Verify correct forwarding based on outer VID"
+    - "Verify inner tag preserved"
+  expected_result:
+    forward_to: "member_ports_only"

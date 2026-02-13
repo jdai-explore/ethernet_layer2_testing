@@ -1,0 +1,38 @@
+# TC8 L2 Test Framework — Tiered Execution Definitions
+#
+# Each tier defines which specs to run and how aggressively
+# to sample the parameter space. Lower tiers run faster.
+
+tiers:
+  smoke:
+    description: "Quick validation — ~1 hour"
+    specs:
+      - SWITCH_GEN_001
+      - SWITCH_GEN_002
+      - SWITCH_GEN_003
+    vid_sampling:
+      - 1
+      - 100
+      - 4094
+    port_sampling: "first_pair"
+    max_duration_hours: 1.0
+
+  core:
+    description: "Core functionality — ~8 hours"
+    specs: "all_5.4 + all_5.5 + all_5.3"
+    vid_sampling:
+      - 0
+      - 1
+      - 100
+      - 1000
+      - 4094
+      - 4095
+    port_sampling: "all_pairs"
+    max_duration_hours: 8.0
+
+  full:
+    description: "Full regression — 40+ hours"
+    specs: "all"
+    vid_sampling: "all"
+    port_sampling: "all_combinations"
+    max_duration_hours: null

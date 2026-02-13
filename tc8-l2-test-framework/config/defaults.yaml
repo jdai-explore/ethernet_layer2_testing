@@ -1,0 +1,15 @@
+# TC8 L2 Test Framework — Default Configuration
+# These values are used when not overridden by DUT profile or CLI flags.
+
+default_vid: 1
+default_payload_size: 64
+cleanup_wait_s: 5.0
+aging_wait_s: 30.0
+frame_timeout_s: 2.0
+max_retries: 3
+link_check_interval_s: 1.0
+interface_type: scapy
+log_level: INFO
+report_format: html
+parallel_execution: false
+database_url: "sqlite:///reports/test_results.db"
