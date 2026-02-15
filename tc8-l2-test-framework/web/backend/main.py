@@ -15,10 +15,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import socket
 import traceback
 from collections import deque
 from pathlib import Path
 from typing import Any
+
+import psutil
 
 import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -489,6 +492,106 @@ async def run_preflight() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Interface Discovery & Topology
+# ---------------------------------------------------------------------------
+
+
+_SKIP_INTERFACE_PREFIXES = (
+    "Loopback", "vEthernet", "Local Area Connection*", "isatap",
+    "Teredo", "6to4", "Bluetooth", "VMware", "VirtualBox",
+    "Hyper-V", "WSL", "Docker", "br-", "veth",
+)
+
+
+def _get_os_interfaces() -> list[dict[str, Any]]:
+    """Detect physical network interfaces on the test station."""
+    stats = psutil.net_if_stats()
+    addrs = psutil.net_if_addrs()
+    results = []
+    for name in sorted(stats.keys()):
+        # Skip virtual / non-physical interfaces
+        if any(name.startswith(p) for p in _SKIP_INTERFACE_PREFIXES):
+            continue
+        info = stats[name]
+        mac = ""
+        ipv4 = ""
+        for a in addrs.get(name, []):
+            if a.family == psutil.AF_LINK:
+                mac = a.address.replace("-", ":")
+            elif a.family == socket.AF_INET:
+                ipv4 = a.address
+        results.append({
+            "name": name,
+            "mac": mac,
+            "ipv4": ipv4,
+            "is_up": info.isup,
+            "speed_mbps": info.speed,
+            "mtu": info.mtu,
+        })
+    return results
+
+
+@app.get("/api/interfaces")
+async def list_interfaces() -> dict[str, Any]:
+    """Auto-detect network interfaces on the test station."""
+    ifaces = _get_os_interfaces()
+    return {"interfaces": ifaces, "count": len(ifaces)}
+
+
+@app.get("/api/topology")
+async def get_topology() -> dict[str, Any]:
+    """Return topology: DUT ports, station interfaces, mappings, and mode."""
+    station_ifaces = _get_os_interfaces()
+    station_names = {iface["name"] for iface in station_ifaces}
+    station_up = {iface["name"] for iface in station_ifaces if iface["is_up"]}
+
+    # Try to load the DUT profile from config
+    dut_ports: list[dict[str, Any]] = []
+    dut_name = "No DUT Loaded"
+    mappings: list[dict[str, Any]] = []
+    mode = "simulation"
+    active_links = 0
+
+    if config.dut_profile:
+        dut_name = config.dut_profile.name
+        for port in config.dut_profile.ports:
+            iface_name = port.interface_name
+            is_mapped = iface_name in station_names
+            is_up = iface_name in station_up if is_mapped else False
+            if is_up:
+                active_links += 1
+            dut_ports.append({
+                "port_id": port.port_id,
+                "interface_name": iface_name,
+                "mac": port.mac_address,
+                "speed_mbps": port.speed_mbps,
+                "vlans": port.vlan_membership,
+                "pvid": port.pvid,
+                "is_trunk": port.is_trunk,
+                "is_mapped": is_mapped,
+                "is_up": is_up,
+            })
+            mappings.append({
+                "dut_port": port.port_id,
+                "station_iface": iface_name,
+                "status": "up" if is_up else ("down" if is_mapped else "unmapped"),
+            })
+
+        if active_links > 0:
+            mode = "actual"
+
+    return {
+        "dut_name": dut_name,
+        "dut_ports": dut_ports,
+        "station_interfaces": station_ifaces,
+        "mappings": mappings,
+        "mode": mode,
+        "active_links": active_links,
+        "total_ports": len(dut_ports),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Report History & Detail Endpoints
 # ---------------------------------------------------------------------------
 
@@ -807,6 +910,89 @@ async def index() -> str:
             }}
             .status-msg.success {{ display: block; background: rgba(34,197,94,0.1); border: 1px solid #22c55e; color: #22c55e; }}
             .status-msg.error {{ display: block; background: rgba(239,68,68,0.1); border: 1px solid #ef4444; color: #ef4444; }}
+
+            /* ── Mode Badge ── */
+            .mode-badge {{
+                display: inline-flex; align-items: center; gap: 0.4rem;
+                padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.72rem;
+                font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+            }}
+            .mode-badge.actual {{ background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }}
+            .mode-badge.simulation {{ background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }}
+            .mode-dot {{ width: 8px; height: 8px; border-radius: 50%; }}
+            .mode-badge.actual .mode-dot {{ background: #22c55e; }}
+            .mode-badge.simulation .mode-dot {{ background: #f59e0b; }}
+
+            /* ── Topology Diagram ── */
+            .topo-container {{
+                display: flex; justify-content: center; align-items: stretch;
+                gap: 2rem; padding: 1.5rem 0;
+            }}
+            .topo-box {{
+                background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+                padding: 1.2rem 1.5rem; min-width: 240px;
+                display: flex; flex-direction: column; gap: 0.6rem;
+            }}
+            .topo-box h3 {{
+                font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem;
+                display: flex; align-items: center; gap: 0.5rem;
+            }}
+            .topo-port {{
+                display: flex; align-items: center; gap: 0.5rem;
+                padding: 0.35rem 0.6rem; border-radius: 6px;
+                font-size: 0.78rem; font-family: 'JetBrains Mono', monospace;
+                background: #0f172a; border: 1px solid #334155;
+            }}
+            .topo-port .port-dot {{ width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }}
+            .topo-port .port-dot.up {{ background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }}
+            .topo-port .port-dot.down {{ background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }}
+            .topo-port .port-dot.unmapped {{ background: #64748b; }}
+            .topo-port .port-name {{ flex: 1; }}
+            .topo-port .port-speed {{ color: #64748b; font-size: 0.68rem; }}
+            .topo-wires {{
+                display: flex; flex-direction: column; justify-content: center;
+                gap: 0.6rem; padding: 0 0.5rem;
+            }}
+            .topo-wire {{
+                display: flex; align-items: center; gap: 0.25rem;
+            }}
+            .topo-wire .wire-line {{
+                width: 60px; height: 2px; border-radius: 1px;
+            }}
+            .topo-wire .wire-line.up {{ background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.4); }}
+            .topo-wire .wire-line.down {{ background: #ef4444; }}
+            .topo-wire .wire-line.unmapped {{ background: #334155; border: 1px dashed #475569; height: 0; }}
+            .topo-mode-bar {{
+                text-align: center; margin-top: 0.75rem;
+            }}
+            .topo-summary {{
+                font-size: 0.78rem; color: #94a3b8; margin-top: 0.3rem;
+            }}
+
+            /* ── Port Config Table ── */
+            .port-table {{
+                width: 100%; border-collapse: collapse; font-size: 0.78rem;
+                margin-top: 0.8rem;
+            }}
+            .port-table th {{
+                text-align: left; padding: 0.4rem 0.5rem; font-size: 0.7rem;
+                text-transform: uppercase; letter-spacing: 0.04em; color: #64748b;
+                border-bottom: 2px solid #334155;
+            }}
+            .port-table td {{ padding: 0.4rem 0.5rem; border-bottom: 1px solid #1e293b; }}
+            .port-table input, .port-table select {{
+                font-size: 0.78rem; padding: 0.25rem 0.4rem; width: 100%;
+                background: #0f172a; border: 1px solid #334155; border-radius: 4px;
+                color: #e2e8f0; font-family: 'JetBrains Mono', monospace;
+            }}
+            .port-table select {{ cursor: pointer; }}
+
+            /* ── Simulation warning ── */
+            .sim-warning {{
+                background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+                color: #f59e0b; padding: 0.5rem 0.8rem; border-radius: 8px;
+                font-size: 0.78rem; margin-bottom: 0.8rem; display: none;
+            }}
         </style>
     </head>
     <body>
@@ -817,6 +1003,7 @@ async def index() -> str:
             <!-- ═══ Tab Bar ═══ -->
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="dashboard">🎛️ Dashboard</button>
+                <button class="tab-btn" data-tab="topology">🗺️ Topology</button>
                 <button class="tab-btn" data-tab="dut-config">🔧 DUT Configuration</button>
                 <button class="tab-btn" data-tab="run-tests">🚀 Run Tests</button>
                 <button class="tab-btn" data-tab="preflight">🩺 Pre-flight Checks</button>
@@ -825,6 +1012,12 @@ async def index() -> str:
 
             <!-- ═══ Tab 1: Dashboard ═══ -->
             <div class="tab-content active" id="tab-dashboard">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem">
+                    <div></div>
+                    <span class="mode-badge simulation" id="dashboard-mode-badge">
+                        <span class="mode-dot"></span> SIMULATION
+                    </span>
+                </div>
                 <div class="cards">
                     <div class="card primary"><div class="value">{spec_count}</div><div class="label">Specifications</div></div>
                     <div class="card green"><div class="value">7</div><div class="label">TC8 Sections</div></div>
@@ -858,7 +1051,35 @@ async def index() -> str:
                 </div>
             </div>
 
-            <!-- ═══ Tab 2: DUT Configuration ═══ -->
+            <!-- ═══ Tab 2: Topology ═══ -->
+            <div class="tab-content" id="tab-topology">
+                <div class="panel">
+                    <h2>🗺️ Network Topology</h2>
+                    <p style="font-size:0.78rem;color:#94a3b8;margin-bottom:0.4rem">
+                        Live view of test station ↔ DUT connections. Auto-refreshes every 5 seconds.
+                    </p>
+                    <div class="topo-mode-bar">
+                        <span class="mode-badge simulation" id="topo-mode-badge">
+                            <span class="mode-dot"></span> <span id="topo-mode-text">SIMULATION</span>
+                        </span>
+                    </div>
+                    <div class="topo-container" id="topo-diagram">
+                        <div class="topo-box" id="topo-station-box">
+                            <h3>🖥️ Test Station</h3>
+                            <div id="topo-station-ports"><span style="color:#64748b;font-size:0.78rem">Detecting…</span></div>
+                        </div>
+                        <div class="topo-wires" id="topo-wires">
+                        </div>
+                        <div class="topo-box" id="topo-dut-box">
+                            <h3>🔲 <span id="topo-dut-name">DUT</span></h3>
+                            <div id="topo-dut-ports"><span style="color:#64748b;font-size:0.78rem">No DUT loaded</span></div>
+                        </div>
+                    </div>
+                    <div class="topo-summary" id="topo-summary"></div>
+                </div>
+            </div>
+
+            <!-- ═══ Tab 3: DUT Configuration ═══ -->
             <div class="tab-content" id="tab-dut-config">
                 <div class="panel">
                     <h2>🔧 DUT Profile Configuration</h2>
@@ -884,7 +1105,7 @@ async def index() -> str:
                             </div>
                             <div class="form-group">
                                 <label>Port Count</label>
-                                <input type="number" id="dut-ports" value="4" min="2" max="16">
+                                <input type="number" id="dut-ports" value="4" min="2" max="16" onchange="rebuildPortTable()">
                             </div>
                             <div class="form-group">
                                 <label>MAC Table Size</label>
@@ -900,6 +1121,24 @@ async def index() -> str:
                                 <div class="toggle-row"><input type="checkbox" id="dut-reset"><span>Can power-cycle / reset between tests</span></div>
                             </div>
                         </div>
+                        <!-- Per-Port Interface Mapping -->
+                        <h3 style="font-size:0.88rem;margin:1rem 0 0.3rem;color:#94a3b8">Port ↔ Interface Mapping</h3>
+                        <div style="overflow-x:auto">
+                        <table class="port-table" id="port-config-table">
+                            <thead>
+                                <tr>
+                                    <th>Port</th>
+                                    <th>OS Interface</th>
+                                    <th>MAC Address</th>
+                                    <th>Speed</th>
+                                    <th>VLANs</th>
+                                    <th>PVID</th>
+                                    <th>Trunk</th>
+                                </tr>
+                            </thead>
+                            <tbody id="port-config-tbody"></tbody>
+                        </table>
+                        </div>
                         <div class="btn-row">
                             <button type="submit" class="btn btn-success">💾 Save Profile</button>
                             <button type="button" class="btn btn-ghost" onclick="clearDutForm()">Clear</button>
@@ -909,8 +1148,11 @@ async def index() -> str:
                 </div>
             </div>
 
-            <!-- ═══ Tab 3: Run Tests ═══ -->
+            <!-- ═══ Tab 4: Run Tests ═══ -->
             <div class="tab-content" id="tab-run-tests">
+                <div class="sim-warning" id="run-sim-warning">
+                    ⚠️ Running in <strong>SIMULATION</strong> mode — no real hardware detected. Results will not reflect actual DUT behavior.
+                </div>
                 <div class="panel">
                     <h2>🚀 Execute Test Suite</h2>
                     <div class="form-grid">
@@ -956,7 +1198,7 @@ async def index() -> str:
                 </div>
             </div>
 
-            <!-- ═══ Tab 4: Pre-flight Checks ═══ -->
+            <!-- ═══ Tab 5: Pre-flight Checks ═══ -->
             <div class="tab-content" id="tab-preflight">
                 <div class="panel">
                     <h2>🩺 Framework Self-Validation</h2>
@@ -969,7 +1211,7 @@ async def index() -> str:
                 </div>
             </div>
 
-            <!-- ═══ Tab 5: Console ═══ -->
+            <!-- ═══ Tab 6: Console ═══ -->
             <div class="tab-content" id="tab-console">
                 <div class="panel">
                     <h2>📋 Real-Time Console</h2>
@@ -1003,10 +1245,11 @@ async def index() -> str:
 
         // ── DUT Profile Data ──
         const profiles = {profiles_json};
+        let detectedInterfaces = [];
+
         function populateProfileDropdowns() {{
             const selects = [document.getElementById('load-profile-select'), document.getElementById('run-dut-select')];
             selects.forEach(sel => {{
-                // Keep first option
                 while (sel.options.length > 1) sel.remove(1);
                 profiles.forEach(p => {{
                     const opt = document.createElement('option');
@@ -1017,6 +1260,70 @@ async def index() -> str:
             }});
         }}
         populateProfileDropdowns();
+
+        // ── Fetch OS Interfaces ──
+        async function fetchInterfaces() {{
+            try {{
+                const res = await fetch('/api/interfaces');
+                const json = await res.json();
+                detectedInterfaces = json.interfaces || [];
+            }} catch(e) {{ console.warn('Failed to fetch interfaces', e); }}
+        }}
+        fetchInterfaces();
+
+        // ── Port Config Table ──
+        function rebuildPortTable(portData) {{
+            const count = parseInt(document.getElementById('dut-ports').value) || 4;
+            const tbody = document.getElementById('port-config-tbody');
+            tbody.innerHTML = '';
+            for (let i = 0; i < count; i++) {{
+                const pd = portData && portData[i] ? portData[i] : null;
+                const tr = document.createElement('tr');
+                // Interface select options
+                let ifaceOpts = '<option value="">(select)</option>';
+                detectedInterfaces.forEach(iface => {{
+                    const sel = (pd && pd.interface_name === iface.name) ? ' selected' : '';
+                    const upIcon = iface.is_up ? '🟢' : '🔴';
+                    ifaceOpts += '<option value="' + iface.name + '"' + sel + '>' + upIcon + ' ' + iface.name + '</option>';
+                }});
+                // If the saved interface isn't in detectedInterfaces, add it
+                if (pd && pd.interface_name && !detectedInterfaces.find(x => x.name === pd.interface_name)) {{
+                    ifaceOpts += '<option value="' + pd.interface_name + '" selected>⚠️ ' + pd.interface_name + '</option>';
+                }}
+                const mac = pd ? pd.mac_address : '02:00:00:00:00:' + (i+1).toString(16).padStart(2,'0');
+                const speed = pd ? pd.speed_mbps : 100;
+                const vlans = pd ? (pd.vlan_membership || [1]).join(',') : '1';
+                const pvid = pd ? (pd.pvid || 1) : 1;
+                const trunk = pd ? (pd.is_trunk || false) : false;
+                tr.innerHTML = '<td style="font-weight:600;color:#60a5fa">' + i + '</td>'
+                    + '<td><select class="port-iface">' + ifaceOpts + '</select></td>'
+                    + '<td><input type="text" class="port-mac" value="' + mac + '" pattern="^([0-9A-Fa-f]{{2}}:){{5}}[0-9A-Fa-f]{{2}}$"></td>'
+                    + '<td><input type="number" class="port-speed" value="' + speed + '" min="10" max="10000" style="width:70px"></td>'
+                    + '<td><input type="text" class="port-vlans" value="' + vlans + '" style="width:80px"></td>'
+                    + '<td><input type="number" class="port-pvid" value="' + pvid + '" min="0" max="4095" style="width:60px"></td>'
+                    + '<td><input type="checkbox" class="port-trunk"' + (trunk ? ' checked' : '') + '></td>';
+                tbody.appendChild(tr);
+            }}
+        }}
+        // Build initial port table after interfaces are loaded
+        fetchInterfaces().then(() => rebuildPortTable());
+
+        function collectPortData() {{
+            const rows = document.querySelectorAll('#port-config-tbody tr');
+            const ports = [];
+            rows.forEach((row, i) => {{
+                ports.push({{
+                    port_id: i,
+                    interface_name: row.querySelector('.port-iface').value || ('eth' + i),
+                    mac_address: row.querySelector('.port-mac').value,
+                    speed_mbps: parseInt(row.querySelector('.port-speed').value) || 100,
+                    vlan_membership: row.querySelector('.port-vlans').value.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v)),
+                    pvid: parseInt(row.querySelector('.port-pvid').value) || 1,
+                    is_trunk: row.querySelector('.port-trunk').checked,
+                }});
+            }});
+            return ports;
+        }}
 
         // ── Load Profile ──
         async function loadProfile() {{
@@ -1037,6 +1344,9 @@ async def index() -> str:
                 document.getElementById('dut-double-tag').checked = d.supports_double_tagging || false;
                 document.getElementById('dut-gptp').checked = d.supports_gptp || false;
                 document.getElementById('dut-reset').checked = d.can_reset || false;
+                // Rebuild port table with loaded data
+                await fetchInterfaces();
+                rebuildPortTable(d.ports || []);
                 showStatus('dut-status', 'success', 'Loaded: ' + d.name);
             }} catch (e) {{
                 showStatus('dut-status', 'error', 'Failed: ' + e.message);
@@ -1056,6 +1366,7 @@ async def index() -> str:
                 double_tagging: document.getElementById('dut-double-tag').checked,
                 gptp: document.getElementById('dut-gptp').checked,
                 can_reset: document.getElementById('dut-reset').checked,
+                ports: collectPortData(),
             }};
             try {{
                 const res = await fetch('/api/dut-profiles', {{
@@ -1065,7 +1376,6 @@ async def index() -> str:
                 const json = await res.json();
                 if (res.ok) {{
                     showStatus('dut-status', 'success', '✅ Profile saved: ' + json.name);
-                    // Add to dropdowns
                     profiles.push({{ name: json.name, path: json.name + '.yaml' }});
                     populateProfileDropdowns();
                 }} else {{
@@ -1079,7 +1389,90 @@ async def index() -> str:
         function clearDutForm() {{
             document.getElementById('dut-form').reset();
             document.getElementById('dut-status').className = 'status-msg';
+            rebuildPortTable();
         }}
+
+        // ── Topology Diagram ──
+        let topoInterval = null;
+
+        async function refreshTopology() {{
+            try {{
+                const res = await fetch('/api/topology');
+                const data = await res.json();
+                renderTopology(data);
+                updateModeBadges(data.mode, data.active_links, data.total_ports);
+            }} catch (e) {{ console.warn('Topology refresh failed', e); }}
+        }}
+
+        function renderTopology(data) {{
+            // Station ports
+            const stationDiv = document.getElementById('topo-station-ports');
+            stationDiv.innerHTML = '';
+            data.station_interfaces.forEach(iface => {{
+                const dn = document.createElement('div');
+                dn.className = 'topo-port';
+                dn.innerHTML = '<span class="port-dot ' + (iface.is_up ? 'up' : 'down') + '"></span>'
+                    + '<span class="port-name">' + iface.name + '</span>'
+                    + '<span class="port-speed">' + (iface.speed_mbps || '-') + ' Mbps</span>';
+                dn.title = 'MAC: ' + (iface.mac || '-') + '\\nIP: ' + (iface.ipv4 || '-');
+                stationDiv.appendChild(dn);
+            }});
+
+            // DUT ports
+            document.getElementById('topo-dut-name').textContent = data.dut_name;
+            const dutDiv = document.getElementById('topo-dut-ports');
+            dutDiv.innerHTML = '';
+            if (data.dut_ports.length === 0) {{
+                dutDiv.innerHTML = '<span style="color:#64748b;font-size:0.78rem">No DUT profile loaded. Configure one in DUT Configuration tab.</span>';
+            }}
+            data.dut_ports.forEach(port => {{
+                const dn = document.createElement('div');
+                dn.className = 'topo-port';
+                const status = port.is_up ? 'up' : (port.is_mapped ? 'down' : 'unmapped');
+                dn.innerHTML = '<span class="port-dot ' + status + '"></span>'
+                    + '<span class="port-name">Port ' + port.port_id + ' (' + port.interface_name + ')</span>'
+                    + '<span class="port-speed">' + port.speed_mbps + ' Mbps</span>';
+                dn.title = 'MAC: ' + port.mac + '\\nVLANs: ' + (port.vlans||[]).join(',') + '\\nPVID: ' + port.pvid + '\\nTrunk: ' + (port.is_trunk ? 'Yes' : 'No');
+                dutDiv.appendChild(dn);
+            }});
+
+            // Wires
+            const wiresDiv = document.getElementById('topo-wires');
+            wiresDiv.innerHTML = '';
+            data.mappings.forEach(m => {{
+                const wire = document.createElement('div');
+                wire.className = 'topo-wire';
+                wire.innerHTML = '<span class="wire-line ' + m.status + '"></span>';
+                wire.title = m.station_iface + ' → Port ' + m.dut_port + ' [' + m.status.toUpperCase() + ']';
+                wiresDiv.appendChild(wire);
+            }});
+
+            // Summary
+            const summary = document.getElementById('topo-summary');
+            summary.textContent = data.active_links + '/' + data.total_ports + ' ports connected • ' + data.station_interfaces.length + ' station interfaces detected';
+        }}
+
+        function updateModeBadges(mode, activeLinks, totalPorts) {{
+            const badges = ['dashboard-mode-badge', 'topo-mode-badge'];
+            badges.forEach(id => {{
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.className = 'mode-badge ' + mode;
+                const text = mode === 'actual'
+                    ? 'ACTUAL (' + activeLinks + '/' + totalPorts + ' active)'
+                    : 'SIMULATION';
+                el.innerHTML = '<span class="mode-dot"></span> ' + text;
+            }});
+            const topoText = document.getElementById('topo-mode-text');
+            if (topoText) topoText.textContent = mode === 'actual' ? 'ACTUAL' : 'SIMULATION';
+            // Show/hide sim warning on Run Tests
+            const warn = document.getElementById('run-sim-warning');
+            if (warn) warn.style.display = mode === 'simulation' ? 'block' : 'none';
+        }}
+
+        // Start topology auto-refresh
+        refreshTopology();
+        topoInterval = setInterval(refreshTopology, 5000);
 
         // ── Run Tests ──
         let progressWs = null;

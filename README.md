@@ -126,7 +126,8 @@ The framework uses a pluggable interface layer for DUT communication:
 - ✅ **200,000+ Test Cases** — Combinatorial test generation
 - ✅ **HTML Reports** — Beautiful, interactive test reports
 - ✅ **Database Persistence** — SQLAlchemy with trend analysis
-- ✅ **Web Dashboard** — Real-time progress, report history
+- ✅ **Web Dashboard** — 6-tab UI with real-time progress, report history, topology diagram
+- ✅ **Topology & Mode Detection** — Auto-detect interfaces, live wiring diagram, simulation/actual mode
 - ✅ **CLI Tool** — Headless execution for CI/CD
 - ✅ **Cross-Platform** — Windows, Linux, macOS, Docker
 - ✅ **Self-Validating** — 17 framework tests ensure correctness

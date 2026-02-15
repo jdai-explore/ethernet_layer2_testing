@@ -449,6 +449,7 @@ tc8-l2-test-framework/
 | **Test Framework** | pytest | Industry-standard Python testing, excellent CI/CD integration |
 | **Web Backend** | FastAPI | Async support, auto-generated API docs, WebSocket support |
 | **Web Frontend** | React or vanilla HTML/JS | Interactive test management UI |
+| **Interface Detection** | psutil | OS network interface discovery and link status |
 | **Configuration** | YAML + Pydantic | Human-readable configs with strict validation |
 | **Reporting** | Jinja2 + WeasyPrint | HTML/PDF report generation |
 | **Database** | SQLite (dev) / PostgreSQL (prod) | Historical results storage and trend analysis |
@@ -651,6 +652,12 @@ gantt
     Integration testing               :p4a, after p3d, 3d
     Documentation                     :p4b, after p4a, 2d
     Self-validation suite             :p4c, after p4a, 2d
+    
+    section Phase 5: Web Enhancements
+    Topology diagram & wiring view    :p5a, after p4c, 2d
+    Interface auto-detection (psutil) :p5b, after p4c, 1d
+    Mode detection (sim vs actual)    :p5c, after p5b, 1d
+    Per-port interface mapping UI     :p5d, after p5a, 1d
 ```
 
 ### 8.2 Test Suite Priority Rationale

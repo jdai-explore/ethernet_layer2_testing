@@ -49,6 +49,16 @@ Look for interfaces connected to ECU (e.g., `eth0`, `eth1`, `enp0s3`)
 | Port 2 | `eth2` or `Ethernet 4` | Green cable |
 | Port 3 | `eth3` or `Ethernet 5` | Yellow cable |
 
+> **💡 Tip: Auto-Detection via Web UI**
+>
+> Instead of running `ipconfig` / `ip link` manually, you can use the Web Dashboard:
+> 1. Start the server: `uvicorn web.backend.main:app --port 8000`
+> 2. Open http://localhost:8000 → **🔧 DUT Configuration** tab
+> 3. The **Port ↔ Interface Mapping** table auto-detects your OS interfaces with live link status (🟢 up / 🔴 down)
+> 4. Select interfaces from the dropdown for each DUT port
+>
+> You can also call `GET /api/interfaces` to list all detected interfaces programmatically.
+
 ## Step 3: Create DUT Profile YAML
 
 Create `config/dut_profiles/my_ecu.yaml`:

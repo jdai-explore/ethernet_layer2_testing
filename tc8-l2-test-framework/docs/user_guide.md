@@ -11,8 +11,9 @@
 4. [DUT Configuration](#dut-configuration)
 5. [Running Tests](#running-tests)
 6. [Web Dashboard](#web-dashboard)
-7. [Understanding Reports](#understanding-reports)
-8. [Troubleshooting](#troubleshooting)
+7. [Topology & Mode Detection](#topology--mode-detection)
+8. [Understanding Reports](#understanding-reports)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -233,12 +234,73 @@ python -m src.cli report <report-id>
 
 ### Web Dashboard
 
-1. **Start Server**: `uvicorn web.backend.main:app --port 8000`
-2. **Navigate**: `http://localhost:8000`
-3. **Select DUT**: Choose profile from dropdown
-4. **Select Tier**: smoke/core/full
-5. **Run**: Click "Run Tests" — progress updates in real-time
-6. **View Report**: Click report ID in history table
+```bash
+uvicorn web.backend.main:app --host 0.0.0.0 --port 8000
+# Open: http://localhost:8000
+```
+
+The web UI has **6 tabs**:
+
+| Tab | Purpose |
+|-----|--------|
+| 🎛️ **Dashboard** | Spec coverage, recent test runs, mode badge |
+| 🗺️ **Topology** | Live station ↔ DUT wiring diagram, connection status |
+| 🔧 **DUT Configuration** | Create/load profiles, per-port interface mapping |
+| 🚀 **Run Tests** | Select DUT + tier, execute with real-time progress |
+| 🩺 **Pre-flight Checks** | Validate framework environment |
+| 📋 **Console** | Real-time log streaming via WebSocket |
+
+**DUT Configuration Tab**:
+1. Select an existing profile from the dropdown, or create a new one
+2. Fill in ECU name, model, firmware, port count, and feature flags
+3. Map each DUT port to a test station OS interface using the **Port ↔ Interface Mapping** table — detected interfaces are auto-populated with link status (🟢 up / 🔴 down)
+4. Click **Save Profile** to create the YAML file
+
+**Run Tests Tab**:
+1. Select a DUT profile and test tier (smoke/core/full)
+2. Choose TC8 sections to include
+3. Click **Start Test** — progress bar and live results appear
+4. Click the report link when complete
+
+---
+
+## Topology & Mode Detection
+
+The framework automatically detects your test station's network interfaces and determines whether you have real DUT hardware connected.
+
+### Operating Modes
+
+| Mode | Meaning | How Triggered |
+|------|---------|---------------|
+| 🟢 **ACTUAL** | Real DUT hardware detected | ≥1 mapped interface is link-UP |
+| 🟡 **SIMULATION** | No hardware / all interfaces down | Default when no links active |
+
+Mode badges appear on the **Dashboard** and **Topology** tabs. A warning banner appears on the **Run Tests** tab when in simulation mode.
+
+### Interface Detection API
+
+```
+GET /api/interfaces
+```
+
+Returns all detected OS network interfaces with link status, MAC address, IP, speed, and MTU. Virtual/loopback interfaces are filtered out.
+
+### Topology API
+
+```
+GET /api/topology
+```
+
+Returns the DUT ↔ station mapping, including per-port connection status (up / down / unmapped), the current operating mode, and active link count.
+
+### Topology Diagram
+
+The 🗺️ **Topology** tab shows a live wiring diagram:
+- **Left box**: Test station interfaces with link status dots
+- **Right box**: DUT ports (from loaded profile)
+- **Wires**: Color-coded connections (🟢 active, 🔴 link down, gray dashed = unmapped)
+- **Auto-refresh**: Updates every 5 seconds
+- **Hover tooltips**: Show MAC address, IP, VLAN membership, PVID
 
 ---
 
