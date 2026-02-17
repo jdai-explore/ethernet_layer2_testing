@@ -1003,10 +1003,10 @@ async def index() -> str:
             <!-- ═══ Tab Bar ═══ -->
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="dashboard">🎛️ Dashboard</button>
-                <button class="tab-btn" data-tab="topology">🗺️ Topology</button>
                 <button class="tab-btn" data-tab="dut-config">🔧 DUT Configuration</button>
-                <button class="tab-btn" data-tab="run-tests">🚀 Run Tests</button>
+                <button class="tab-btn" data-tab="topology">🗺️ Topology</button>
                 <button class="tab-btn" data-tab="preflight">🩺 Pre-flight Checks</button>
+                <button class="tab-btn" data-tab="run-tests">🚀 Run Tests</button>
                 <button class="tab-btn" data-tab="console">📋 Console</button>
             </div>
 
@@ -1378,6 +1378,9 @@ async def index() -> str:
                     showStatus('dut-status', 'success', '✅ Profile saved: ' + json.name);
                     profiles.push({{ name: json.name, path: json.name + '.yaml' }});
                     populateProfileDropdowns();
+                    // Refresh topology to show updated DUT configuration
+                    await refreshTopology();
+                    updateModeBadges();
                 }} else {{
                     showStatus('dut-status', 'error', '❌ ' + (json.detail || 'Error'));
                 }}
@@ -1483,6 +1486,12 @@ async def index() -> str:
 
             const tier = document.getElementById('run-tier').value;
             const sections = Array.from(document.querySelectorAll('.run-section:checked')).map(c => c.value);
+            
+            // Warn if no sections selected (would result in 0 tests)
+            if (sections.length === 0) {{
+                alert('\u26a0\ufe0f No sections selected! Please check at least one section (5.3-5.9) to run tests.');
+                return;
+            }}
 
             document.getElementById('btn-start-test').disabled = true;
             document.getElementById('btn-cancel-test').disabled = false;

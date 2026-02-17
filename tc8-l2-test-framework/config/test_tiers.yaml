@@ -7,9 +7,10 @@ tiers:
   smoke:
     description: "Quick validation — ~1 hour"
     specs:
-      - SWITCH_GEN_001
-      - SWITCH_GEN_002
-      - SWITCH_GEN_003
+      - SWITCH_GEN_001      # 5.4 General - Unicast forwarding
+      - SWITCH_GEN_002      # 5.4 General - Broadcast flooding
+      - SWITCH_ADDR_001     # 5.5 Address Learning - Basic learning
+      - SWITCH_VLAN_001     # 5.3 VLAN - Tagged frame forwarding
     vid_sampling:
       - 1
       - 100
