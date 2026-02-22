@@ -223,6 +223,14 @@ class FrameCapture(BaseModel):
     payload_size: int = Field(default=0)
 
 
+class LogEntry(BaseModel):
+    """Single log message captured during test execution."""
+
+    timestamp: float = Field(description="Epoch seconds")
+    level: str = Field(description="Log level: DEBUG, INFO, WARNING, ERROR")
+    source: str = Field(default="", description="Logger name, e.g. test_runner")
+    message: str
+
 
 class TestResult(BaseModel):
     """Result of executing a single test case."""
@@ -249,6 +257,9 @@ class TestResult(BaseModel):
     message: str = Field(default="")
     error_detail: str | None = None
     warnings: list[str] = Field(default_factory=list)
+
+    # Per-test execution log
+    log_entries: list[LogEntry] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

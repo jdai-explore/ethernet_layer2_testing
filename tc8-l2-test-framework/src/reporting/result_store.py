@@ -83,6 +83,14 @@ class ResultStore:
                         default=str,
                     )
 
+            # Serialize log entries
+            log_json = None
+            if r.log_entries:
+                log_json = json.dumps(
+                    [e.model_dump() for e in r.log_entries],
+                    default=str,
+                )
+
             run.results.append(
                 TestResultRecord(
                     case_id=r.case_id,
@@ -97,6 +105,7 @@ class ResultStore:
                     actual_json=json.dumps(r.actual, default=str) if r.actual else None,
                     sent_frames_json=sent_json,
                     received_frames_json=received_json,
+                    log_entries_json=log_json,
                 )
             )
 

@@ -96,6 +96,7 @@ class TestResultRecord(Base):
     actual_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     sent_frames_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     received_frames_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    log_entries_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationship back to run
     run: Mapped[TestRunRecord] = relationship("TestRunRecord", back_populates="results")
@@ -112,7 +113,7 @@ class TestResultRecord(Base):
             "error_detail": self.error_detail,
         }
         # Deserialize JSON columns if present
-        for key in ("expected_json", "actual_json", "sent_frames_json", "received_frames_json"):
+        for key in ("expected_json", "actual_json", "sent_frames_json", "received_frames_json", "log_entries_json"):
             raw = getattr(self, key, None)
             dict_key = key.replace("_json", "")
             result[dict_key] = json.loads(raw) if raw else None

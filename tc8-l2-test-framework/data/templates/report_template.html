@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,410 +20,849 @@
             --text: #e2e8f0;
             --text-dim: #94a3b8;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-            background: var(--bg); color: var(--text);
-            line-height: 1.6; padding: 2rem;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
         }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-        h2 { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: var(--text); }
-        .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--text);
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
 
         /* Header */
-        .header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
-        .header-meta { text-align: right; font-size: 0.85rem; color: var(--text-dim); }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-meta {
+            text-align: right;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
 
         /* Summary Cards */
-        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
-        .card .value { font-size: 1.8rem; font-weight: 700; }
-        .card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
-        .card.pass .value { color: var(--color-pass); }
-        .card.fail .value { color: var(--color-fail); }
-        .card.info .value { color: var(--color-info); }
-        .card.skip .value { color: var(--color-skip); }
-        .card.error .value { color: var(--color-error); }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .card .label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+        }
+
+        .card.pass .value {
+            color: var(--color-pass);
+        }
+
+        .card.fail .value {
+            color: var(--color-fail);
+        }
+
+        .card.info .value {
+            color: var(--color-info);
+        }
+
+        .card.skip .value {
+            color: var(--color-skip);
+        }
+
+        .card.error .value {
+            color: var(--color-error);
+        }
 
         /* Progress Bar */
-        .progress-bar { height: 8px; border-radius: 4px; background: var(--surface); overflow: hidden; margin-bottom: 1.5rem; display: flex; }
-        .progress-bar .seg { height: 100%; }
-        .seg.pass { background: var(--color-pass); }
-        .seg.fail { background: var(--color-fail); }
-        .seg.info { background: var(--color-info); }
-        .seg.skip { background: var(--color-skip); }
-        .seg.error { background: var(--color-error); }
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: var(--surface);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            display: flex;
+        }
+
+        .progress-bar .seg {
+            height: 100%;
+        }
+
+        .seg.pass {
+            background: var(--color-pass);
+        }
+
+        .seg.fail {
+            background: var(--color-fail);
+        }
+
+        .seg.info {
+            background: var(--color-info);
+        }
+
+        .seg.skip {
+            background: var(--color-skip);
+        }
+
+        .seg.error {
+            background: var(--color-error);
+        }
 
         /* Charts Grid */
-        .charts-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; margin-bottom: 2rem; }
-        .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
-        .chart-card h3 { font-size: 0.95rem; margin-bottom: 1rem; color: var(--text); }
-        .chart-wrapper { position: relative; max-height: 300px; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+
+        .chart-card h3 {
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            max-height: 300px;
+        }
 
         /* Table */
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid var(--border); color: var(--text-dim); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
-        td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
-        tr:hover td { background: rgba(255,255,255,0.02); }
-        tr.clickable { cursor: pointer; }
-        tr.clickable:hover td { background: var(--surface-hover); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 2px solid var(--border);
+            color: var(--text-dim);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        td {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        tr.clickable {
+            cursor: pointer;
+        }
+
+        tr.clickable:hover td {
+            background: var(--surface-hover);
+        }
 
         /* Status badges */
-        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-        .badge.pass { background: rgba(34,197,94,0.15); color: var(--color-pass); }
-        .badge.fail { background: rgba(239,68,68,0.15); color: var(--color-fail); }
-        .badge.informational { background: rgba(59,130,246,0.15); color: var(--color-info); }
-        .badge.skip { background: rgba(163,163,163,0.15); color: var(--color-skip); }
-        .badge.error { background: rgba(245,158,11,0.15); color: var(--color-error); }
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.pass {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--color-pass);
+        }
+
+        .badge.fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--color-fail);
+        }
+
+        .badge.informational {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--color-info);
+        }
+
+        .badge.skip {
+            background: rgba(163, 163, 163, 0.15);
+            color: var(--color-skip);
+        }
+
+        .badge.error {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--color-error);
+        }
 
         /* Section cards */
-        .section-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
-        .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
-        .section-card h3 { font-size: 0.9rem; margin-bottom: 0.5rem; }
-        .section-card .stats { display: flex; gap: 0.75rem; font-size: 0.8rem; }
-        .section-card .stats span { display: flex; align-items: center; gap: 0.25rem; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .dot.pass { background: var(--color-pass); }
-        .dot.fail { background: var(--color-fail); }
-        .dot.info { background: var(--color-info); }
+        .section-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .section-card h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-card .stats {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .section-card .stats span {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot.pass {
+            background: var(--color-pass);
+        }
+
+        .dot.fail {
+            background: var(--color-fail);
+        }
+
+        .dot.info {
+            background: var(--color-info);
+        }
 
         /* Toggle buttons */
-        .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
-        .filter-btn { padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
-        .filter-btn.active { background: rgba(96,165,250,0.15); color: #60a5fa; border-color: #60a5fa; }
-        .filter-btn:hover { background: var(--surface-hover); }
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .filter-btn.active {
+            background: rgba(96, 165, 250, 0.15);
+            color: #60a5fa;
+            border-color: #60a5fa;
+        }
+
+        .filter-btn:hover {
+            background: var(--surface-hover);
+        }
 
         /* Detail panel */
-        .detail-row { display: none; }
-        .detail-row td { padding: 0; }
-        .detail-panel { background: #111827; border: 1px solid var(--border); border-radius: 6px; margin: 0.5rem 0.75rem 1rem; padding: 1rem; }
-        .detail-panel h4 { font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text); }
-        .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-        .diff-box { background: var(--surface); border-radius: 6px; padding: 0.75rem; }
-        .diff-box h5 { font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; }
-        .diff-box pre { font-family: 'Cascadia Code', monospace; font-size: 0.8rem; white-space: pre-wrap; color: var(--text); }
+        .detail-row {
+            display: none;
+        }
 
-        .message { color: var(--text-dim); font-size: 0.8rem; font-style: italic; }
-        .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim); text-align: center; }
+        .detail-row td {
+            padding: 0;
+        }
+
+        .detail-panel {
+            background: #111827;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin: 0.5rem 0.75rem 1rem;
+            padding: 1rem;
+        }
+
+        .detail-panel h4 {
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+
+        .diff-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .diff-box {
+            background: var(--surface);
+            border-radius: 6px;
+            padding: 0.75rem;
+        }
+
+        .diff-box h5 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .diff-box pre {
+            font-family: 'Cascadia Code', monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            color: var(--text);
+        }
+
+        .message {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+
+        /* Log table */
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            background: #0d1117;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .log-table thead th {
+            background: #161b22;
+            padding: 0.4rem 0.6rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-dim);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .log-table tbody td {
+            padding: 0.3rem 0.6rem;
+            border-top: 1px solid #21262d;
+            vertical-align: top;
+        }
+
+        .log-time {
+            color: #8b949e;
+            white-space: nowrap;
+        }
+
+        .log-source {
+            color: #79c0ff;
+            white-space: nowrap;
+        }
+
+        .log-msg {
+            color: #c9d1d9;
+            word-break: break-word;
+        }
+
+        .log-badge {
+            display: inline-block;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .log-badge.debug {
+            background: rgba(139, 148, 158, 0.2);
+            color: #8b949e;
+        }
+
+        .log-badge.info {
+            background: rgba(56, 139, 253, 0.2);
+            color: #58a6ff;
+        }
+
+        .log-badge.warning {
+            background: rgba(210, 153, 34, 0.2);
+            color: #d29922;
+        }
+
+        .log-badge.error {
+            background: rgba(248, 81, 73, 0.2);
+            color: #f85149;
+        }
+
+        tr.log-error td {
+            background: rgba(248, 81, 73, 0.05);
+        }
+
+        tr.log-warning td {
+            background: rgba(210, 153, 34, 0.05);
+        }
+
+        .footer {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-align: center;
+        }
 
         /* Hexdump styles */
-        {{ hexdump_css }}
+            {
+                {
+                hexdump_css
+            }
+        }
 
         /* Print */
         @media print {
-            body { background: white; color: #1a1a1a; padding: 1rem; }
-            .chart-card, .card { border-color: #ccc; background: #f9f9f9; }
-            .detail-row { display: table-row !important; }
-            .filter-bar { display: none; }
-            .badge { border: 1px solid currentColor; }
+            body {
+                background: white;
+                color: #1a1a1a;
+                padding: 1rem;
+            }
+
+            .chart-card,
+            .card {
+                border-color: #ccc;
+                background: #f9f9f9;
+            }
+
+            .detail-row {
+                display: table-row !important;
+            }
+
+            .filter-bar {
+                display: none;
+            }
+
+            .badge {
+                border: 1px solid currentColor;
+            }
         }
     </style>
 </head>
+
 <body>
-<div class="container">
-    <!-- Header -->
-    <div class="header">
-        <div>
-            <h1>TC8 Layer 2 Test Report</h1>
-            <div class="subtitle">
-                OPEN Alliance TC8 v{{ tc8_version }} Compliance —
-                {% if report.dut_profile %}{{ report.dut_profile.name }}{% else %}Unknown DUT{% endif %}
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>TC8 Layer 2 Test Report</h1>
+                <div class="subtitle">
+                    OPEN Alliance TC8 v{{ tc8_version }} Compliance —
+                    {% if report.dut_profile %}{{ report.dut_profile.name }}{% else %}Unknown DUT{% endif %}
+                </div>
+            </div>
+            <div class="header-meta">
+                <div>Report: <strong>{{ report.report_id }}</strong></div>
+                <div>Tier: <strong>{{ report.tier.value | upper }}</strong></div>
+                <div>Duration: <strong>{{ "%.1f" | format(report.duration_s) }}s</strong></div>
+                <div>{{ generated_at }}</div>
             </div>
         </div>
-        <div class="header-meta">
-            <div>Report: <strong>{{ report.report_id }}</strong></div>
-            <div>Tier: <strong>{{ report.tier.value | upper }}</strong></div>
-            <div>Duration: <strong>{{ "%.1f" | format(report.duration_s) }}s</strong></div>
-            <div>{{ generated_at }}</div>
-        </div>
-    </div>
 
-    <!-- Summary Cards -->
-    <div class="cards">
-        <div class="card">
-            <div class="value">{{ report.total_cases }}</div>
-            <div class="label">Total</div>
-        </div>
-        <div class="card pass">
-            <div class="value">{{ report.passed }}</div>
-            <div class="label">Passed</div>
-        </div>
-        <div class="card fail">
-            <div class="value">{{ report.failed }}</div>
-            <div class="label">Failed</div>
-        </div>
-        <div class="card info">
-            <div class="value">{{ report.informational }}</div>
-            <div class="label">Info</div>
-        </div>
-        <div class="card skip">
-            <div class="value">{{ report.skipped }}</div>
-            <div class="label">Skipped</div>
-        </div>
-        <div class="card error">
-            <div class="value">{{ report.errors }}</div>
-            <div class="label">Errors</div>
-        </div>
-        <div class="card pass">
-            <div class="value">{{ pass_rate }}%</div>
-            <div class="label">Pass Rate</div>
-        </div>
-    </div>
-
-    <!-- Progress Bar -->
-    {% set total = report.total_cases if report.total_cases > 0 else 1 %}
-    <div class="progress-bar">
-        <div class="seg pass" style="width:{{ (report.passed / total * 100) | round(1) }}%"></div>
-        <div class="seg fail" style="width:{{ (report.failed / total * 100) | round(1) }}%"></div>
-        <div class="seg info" style="width:{{ (report.informational / total * 100) | round(1) }}%"></div>
-        <div class="seg skip" style="width:{{ (report.skipped / total * 100) | round(1) }}%"></div>
-        <div class="seg error" style="width:{{ (report.errors / total * 100) | round(1) }}%"></div>
-    </div>
-
-    <!-- Charts -->
-    <div class="charts-grid">
-        <div class="chart-card">
-            <h3>Pass / Fail Distribution</h3>
-            <div class="chart-wrapper">
-                <canvas id="doughnutChart"></canvas>
+        <!-- Summary Cards -->
+        <div class="cards">
+            <div class="card">
+                <div class="value">{{ report.total_cases }}</div>
+                <div class="label">Total</div>
+            </div>
+            <div class="card pass">
+                <div class="value">{{ report.passed }}</div>
+                <div class="label">Passed</div>
+            </div>
+            <div class="card fail">
+                <div class="value">{{ report.failed }}</div>
+                <div class="label">Failed</div>
+            </div>
+            <div class="card info">
+                <div class="value">{{ report.informational }}</div>
+                <div class="label">Info</div>
+            </div>
+            <div class="card skip">
+                <div class="value">{{ report.skipped }}</div>
+                <div class="label">Skipped</div>
+            </div>
+            <div class="card error">
+                <div class="value">{{ report.errors }}</div>
+                <div class="label">Errors</div>
+            </div>
+            <div class="card pass">
+                <div class="value">{{ pass_rate }}%</div>
+                <div class="label">Pass Rate</div>
             </div>
         </div>
-        <div class="chart-card">
-            <h3>Results by TC8 Section</h3>
-            <div class="chart-wrapper">
-                <canvas id="sectionChart"></canvas>
+
+        <!-- Progress Bar -->
+        {% set total = report.total_cases if report.total_cases > 0 else 1 %}
+        <div class="progress-bar">
+            <div class="seg pass" style="width:{{ (report.passed / total * 100) | round(1) }}%"></div>
+            <div class="seg fail" style="width:{{ (report.failed / total * 100) | round(1) }}%"></div>
+            <div class="seg info" style="width:{{ (report.informational / total * 100) | round(1) }}%"></div>
+            <div class="seg skip" style="width:{{ (report.skipped / total * 100) | round(1) }}%"></div>
+            <div class="seg error" style="width:{{ (report.errors / total * 100) | round(1) }}%"></div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>Pass / Fail Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="doughnutChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Results by TC8 Section</h3>
+                <div class="chart-wrapper">
+                    <canvas id="sectionChart"></canvas>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Section Breakdown -->
-    <h2>Section Breakdown</h2>
-    <div class="section-grid">
-        {% for sec_name, stats in section_stats.items() %}
-        <div class="section-card">
-            <h3>{{ sec_name }}</h3>
-            <div class="stats">
-                <span><span class="dot pass"></span> {{ stats.pass }}</span>
-                <span><span class="dot fail"></span> {{ stats.fail }}</span>
-                <span><span class="dot info"></span> {{ stats.info }}</span>
+        <!-- Section Breakdown -->
+        <h2>Section Breakdown</h2>
+        <div class="section-grid">
+            {% for sec_name, stats in section_stats.items() %}
+            <div class="section-card">
+                <h3>{{ sec_name }}</h3>
+                <div class="stats">
+                    <span><span class="dot pass"></span> {{ stats.pass }}</span>
+                    <span><span class="dot fail"></span> {{ stats.fail }}</span>
+                    <span><span class="dot info"></span> {{ stats.info }}</span>
+                </div>
             </div>
-        </div>
-        {% endfor %}
-    </div>
-
-    <!-- Failures -->
-    {% if failures %}
-    <h2>⚠ Failures ({{ failures | length }})</h2>
-    <table>
-        <thead>
-            <tr><th>Case ID</th><th>Spec</th><th>Section</th><th>Message</th></tr>
-        </thead>
-        <tbody>
-            {% for r in failures %}
-            <tr>
-                <td>{{ r.case_id }}</td>
-                <td>{{ r.spec_id }}</td>
-                <td>{{ r.section.value if r.section else '-' }}</td>
-                <td class="message">{{ r.message or 'No details' }}</td>
-            </tr>
             {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
+        </div>
 
-    <!-- Errors -->
-    {% if errors %}
-    <h2>🔴 Errors ({{ errors | length }})</h2>
-    <table>
-        <thead>
-            <tr><th>Case ID</th><th>Spec</th><th>Message</th></tr>
-        </thead>
-        <tbody>
-            {% for r in errors %}
-            <tr>
-                <td>{{ r.case_id }}</td>
-                <td>{{ r.spec_id }}</td>
-                <td class="message">{{ r.message or r.error_detail or 'Unknown error' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
+        <!-- Failures -->
+        {% if failures %}
+        <h2>⚠ Failures ({{ failures | length }})</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Case ID</th>
+                    <th>Spec</th>
+                    <th>Section</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in failures %}
+                <tr>
+                    <td>{{ r.case_id }}</td>
+                    <td>{{ r.spec_id }}</td>
+                    <td>{{ r.section.value if r.section else '-' }}</td>
+                    <td class="message">{{ r.message or 'No details' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
 
-    <!-- All Results with interactive toggles -->
-    <h2>All Results ({{ report.results | length }})</h2>
-    <div class="filter-bar">
-        <button class="filter-btn active" data-filter="all">All</button>
-        <button class="filter-btn" data-filter="pass">✅ Pass</button>
-        <button class="filter-btn" data-filter="fail">❌ Fail</button>
-        <button class="filter-btn" data-filter="informational">ℹ️ Info</button>
-        <button class="filter-btn" data-filter="skip">⏭️ Skip</button>
-        <button class="filter-btn" data-filter="error">💥 Error</button>
-    </div>
-    <table id="results-table">
-        <thead>
-            <tr><th>Status</th><th>Case ID</th><th>Spec</th><th>Section</th><th>Duration</th><th>Message</th></tr>
-        </thead>
-        <tbody>
-            {% for r in report.results %}
-            <tr class="clickable result-row" data-status="{{ r.status.value }}" data-case="{{ r.case_id }}">
-                <td><span class="badge {{ r.status.value }}">{{ r.status.value }}</span></td>
-                <td>{{ r.case_id }}</td>
-                <td>{{ r.spec_id }}</td>
-                <td>{{ r.section.value if r.section else '-' }}</td>
-                <td>{{ "%.1f" | format(r.duration_ms) }}ms</td>
-                <td class="message">{{ r.message or '' }}</td>
-            </tr>
-            <!-- Detail panel (initially hidden) -->
-            <tr class="detail-row" id="detail-{{ loop.index }}">
-                <td colspan="6">
-                    <div class="detail-panel">
-                        {% set detail = result_details.get(r.case_id, {}) %}
-                        {% if detail.get('expected') or detail.get('actual') %}
-                        <h4>Expected vs Actual</h4>
-                        <div class="diff-grid">
-                            <div class="diff-box">
-                                <h5>Expected</h5>
-                                <pre>{% for k, v in (detail.get('expected') or {}).items() %}{{ k }}: {{ v }}
+        <!-- Errors -->
+        {% if errors %}
+        <h2>🔴 Errors ({{ errors | length }})</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Case ID</th>
+                    <th>Spec</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in errors %}
+                <tr>
+                    <td>{{ r.case_id }}</td>
+                    <td>{{ r.spec_id }}</td>
+                    <td class="message">{{ r.message or r.error_detail or 'Unknown error' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- All Results with interactive toggles -->
+        <h2>All Results ({{ report.results | length }})</h2>
+        <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="pass">✅ Pass</button>
+            <button class="filter-btn" data-filter="fail">❌ Fail</button>
+            <button class="filter-btn" data-filter="informational">ℹ️ Info</button>
+            <button class="filter-btn" data-filter="skip">⏭️ Skip</button>
+            <button class="filter-btn" data-filter="error">💥 Error</button>
+        </div>
+        <table id="results-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Case ID</th>
+                    <th>Spec</th>
+                    <th>Section</th>
+                    <th>Duration</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in report.results %}
+                <tr class="clickable result-row" data-status="{{ r.status.value }}" data-case="{{ r.case_id }}">
+                    <td><span class="badge {{ r.status.value }}">{{ r.status.value }}</span></td>
+                    <td>{{ r.case_id }}</td>
+                    <td>{{ r.spec_id }}</td>
+                    <td>{{ r.section.value if r.section else '-' }}</td>
+                    <td>{{ "%.1f" | format(r.duration_ms) }}ms</td>
+                    <td class="message">{{ r.message or '' }}</td>
+                </tr>
+                <!-- Detail panel (initially hidden) -->
+                <tr class="detail-row" id="detail-{{ loop.index }}">
+                    <td colspan="6">
+                        <div class="detail-panel">
+                            {% set detail = result_details.get(r.case_id, {}) %}
+                            {% if detail.get('expected') or detail.get('actual') %}
+                            <h4>Expected vs Actual</h4>
+                            <div class="diff-grid">
+                                <div class="diff-box">
+                                    <h5>Expected</h5>
+                                    <pre>{% for k, v in (detail.get('expected') or {}).items() %}{{ k }}: {{ v }}
 {% endfor %}</pre>
-                            </div>
-                            <div class="diff-box">
-                                <h5>Actual</h5>
-                                <pre>{% for k, v in (detail.get('actual') or {}).items() %}{{ k }}: {{ v }}
+                                </div>
+                                <div class="diff-box">
+                                    <h5>Actual</h5>
+                                    <pre>{% for k, v in (detail.get('actual') or {}).items() %}{{ k }}: {{ v }}
 {% endfor %}</pre>
+                                </div>
                             </div>
+                            {% endif %}
+                            {% if detail.get('log_entries') %}
+                            <h4>📋 Test Log</h4>
+                            <table class="log-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Level</th>
+                                        <th>Source</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in detail.log_entries %}
+                                    <tr class="log-{{ entry.level | lower }}">
+                                        <td class="log-time">{{ entry.time }}</td>
+                                        <td><span class="log-badge {{ entry.level | lower }}">{{ entry.level }}</span>
+                                        </td>
+                                        <td class="log-source">{{ entry.source }}</td>
+                                        <td class="log-msg">{{ entry.message }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% endif %}
+                            {% if detail.get('sent_hexdumps') %}
+                            <h4>Sent Frames</h4>
+                            {% for frame in detail.sent_hexdumps %}
+                            <details>
+                                <summary style="cursor:pointer;color:#60a5fa;font-size:0.85rem;margin-bottom:0.5rem">
+                                    Port {{ frame.port }} — {{ frame.summary.src_mac }} → {{ frame.summary.dst_mac }}
+                                    ({{ frame.summary.ethertype_name }}, {{ frame.summary.total_len }} bytes)
+                                </summary>
+                                {{ frame.hex_html }}
+                            </details>
+                            {% endfor %}
+                            {% endif %}
+                            {% if detail.get('received_hexdumps') %}
+                            <h4>Received Frames</h4>
+                            {% for frame in detail.received_hexdumps %}
+                            <details>
+                                <summary style="cursor:pointer;color:#60a5fa;font-size:0.85rem;margin-bottom:0.5rem">
+                                    Port {{ frame.port }} — {{ frame.summary.src_mac }} → {{ frame.summary.dst_mac }}
+                                    ({{ frame.summary.ethertype_name }}, {{ frame.summary.total_len }} bytes)
+                                </summary>
+                                {{ frame.hex_html }}
+                            </details>
+                            {% endfor %}
+                            {% endif %}
+                            {% if not detail.get('sent_hexdumps') and not detail.get('received_hexdumps') and not
+                            detail.get('expected') and not detail.get('actual') and not detail.get('log_entries') %}
+                            <p style="color:var(--text-dim);font-size:0.85rem">No frame capture data available for this
+                                result.</p>
+                            {% endif %}
                         </div>
-                        {% endif %}
-                        {% if detail.get('sent_hexdumps') %}
-                        <h4>Sent Frames</h4>
-                        {% for frame in detail.sent_hexdumps %}
-                        <details>
-                            <summary style="cursor:pointer;color:#60a5fa;font-size:0.85rem;margin-bottom:0.5rem">
-                                Port {{ frame.port }} — {{ frame.summary.src_mac }} → {{ frame.summary.dst_mac }}
-                                ({{ frame.summary.ethertype_name }}, {{ frame.summary.total_len }} bytes)
-                            </summary>
-                            {{ frame.hex_html }}
-                        </details>
-                        {% endfor %}
-                        {% endif %}
-                        {% if detail.get('received_hexdumps') %}
-                        <h4>Received Frames</h4>
-                        {% for frame in detail.received_hexdumps %}
-                        <details>
-                            <summary style="cursor:pointer;color:#60a5fa;font-size:0.85rem;margin-bottom:0.5rem">
-                                Port {{ frame.port }} — {{ frame.summary.src_mac }} → {{ frame.summary.dst_mac }}
-                                ({{ frame.summary.ethertype_name }}, {{ frame.summary.total_len }} bytes)
-                            </summary>
-                            {{ frame.hex_html }}
-                        </details>
-                        {% endfor %}
-                        {% endif %}
-                        {% if not detail.get('sent_hexdumps') and not detail.get('received_hexdumps') and not detail.get('expected') and not detail.get('actual') %}
-                        <p style="color:var(--text-dim);font-size:0.85rem">No frame capture data available for this result.</p>
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-    <div class="footer">
-        TC8 L2 Test Framework v{{ framework_version }} — Generated {{ generated_at }}
+        <div class="footer">
+            TC8 L2 Test Framework v{{ framework_version }} — Generated {{ generated_at }}
+        </div>
     </div>
-</div>
 
-<script>
-// Chart data from template context
-const chartData = {{ chart_data_json }};
+    <script>
+        // Chart data from template context
+        const chartData = {{ chart_data_json }};
 
-// --- Doughnut Chart ---
-const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
-new Chart(doughnutCtx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Pass', 'Fail', 'Informational', 'Skip', 'Error'],
-        datasets: [{
-            data: [
-                chartData.summary.pass,
-                chartData.summary.fail,
-                chartData.summary.info,
-                chartData.summary.skip,
-                chartData.summary.error,
-            ],
-            backgroundColor: ['#22c55e', '#ef4444', '#3b82f6', '#a3a3a3', '#f59e0b'],
-            borderColor: '#1e293b',
-            borderWidth: 2,
-        }],
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-            legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
-        },
-        cutout: '60%',
-    },
-});
-
-// --- Section Bar Chart ---
-const sectionCtx = document.getElementById('sectionChart').getContext('2d');
-new Chart(sectionCtx, {
-    type: 'bar',
-    data: {
-        labels: chartData.sections,
-        datasets: [
-            { label: 'Pass', data: chartData.section_pass, backgroundColor: '#22c55e' },
-            { label: 'Fail', data: chartData.section_fail, backgroundColor: '#ef4444' },
-            { label: 'Info', data: chartData.section_info, backgroundColor: '#3b82f6' },
-            { label: 'Skip', data: chartData.section_skip, backgroundColor: '#a3a3a3' },
-            { label: 'Error', data: chartData.section_error, backgroundColor: '#f59e0b' },
-        ],
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        indexAxis: 'y',
-        scales: {
-            x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-            y: { stacked: true, ticks: { color: '#e2e8f0', font: { size: 11 } }, grid: { display: false } },
-        },
-        plugins: {
-            legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
-        },
-    },
-});
-
-// --- Filter Buttons ---
-document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const filter = btn.dataset.filter;
-        document.querySelectorAll('.result-row').forEach(row => {
-            const status = row.dataset.status;
-            const show = filter === 'all' || status === filter;
-            row.style.display = show ? '' : 'none';
-            // Also hide detail row if parent hidden
-            const detailRow = row.nextElementSibling;
-            if (detailRow && detailRow.classList.contains('detail-row') && !show) {
-                detailRow.style.display = 'none';
-            }
+        // --- Doughnut Chart ---
+        const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
+        new Chart(doughnutCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pass', 'Fail', 'Informational', 'Skip', 'Error'],
+                datasets: [{
+                    data: [
+                        chartData.summary.pass,
+                        chartData.summary.fail,
+                        chartData.summary.info,
+                        chartData.summary.skip,
+                        chartData.summary.error,
+                    ],
+                    backgroundColor: ['#22c55e', '#ef4444', '#3b82f6', '#a3a3a3', '#f59e0b'],
+                    borderColor: '#1e293b',
+                    borderWidth: 2,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
+                },
+                cutout: '60%',
+            },
         });
-    });
-});
 
-// --- Click to expand/collapse detail rows ---
-document.querySelectorAll('.result-row').forEach(row => {
-    row.addEventListener('click', () => {
-        const detailRow = row.nextElementSibling;
-        if (detailRow && detailRow.classList.contains('detail-row')) {
-            const isVisible = detailRow.style.display === 'table-row';
-            detailRow.style.display = isVisible ? 'none' : 'table-row';
-        }
-    });
-});
-</script>
+        // --- Section Bar Chart ---
+        const sectionCtx = document.getElementById('sectionChart').getContext('2d');
+        new Chart(sectionCtx, {
+            type: 'bar',
+            data: {
+                labels: chartData.sections,
+                datasets: [
+                    { label: 'Pass', data: chartData.section_pass, backgroundColor: '#22c55e' },
+                    { label: 'Fail', data: chartData.section_fail, backgroundColor: '#ef4444' },
+                    { label: 'Info', data: chartData.section_info, backgroundColor: '#3b82f6' },
+                    { label: 'Skip', data: chartData.section_skip, backgroundColor: '#a3a3a3' },
+                    { label: 'Error', data: chartData.section_error, backgroundColor: '#f59e0b' },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y',
+                scales: {
+                    x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                    y: { stacked: true, ticks: { color: '#e2e8f0', font: { size: 11 } }, grid: { display: false } },
+                },
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
+                },
+            },
+        });
+
+        // --- Filter Buttons ---
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const filter = btn.dataset.filter;
+                document.querySelectorAll('.result-row').forEach(row => {
+                    const status = row.dataset.status;
+                    const show = filter === 'all' || status === filter;
+                    row.style.display = show ? '' : 'none';
+                    // Also hide detail row if parent hidden
+                    const detailRow = row.nextElementSibling;
+                    if (detailRow && detailRow.classList.contains('detail-row') && !show) {
+                        detailRow.style.display = 'none';
+                    }
+                });
+            });
+        });
+
+        // --- Click to expand/collapse detail rows ---
+        document.querySelectorAll('.result-row').forEach(row => {
+            row.addEventListener('click', () => {
+                const detailRow = row.nextElementSibling;
+                if (detailRow && detailRow.classList.contains('detail-row')) {
+                    const isVisible = detailRow.style.display === 'table-row';
+                    detailRow.style.display = isVisible ? 'none' : 'table-row';
+                }
+            });
+        });
+    </script>
 </body>
+
 </html>

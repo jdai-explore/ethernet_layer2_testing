@@ -134,7 +134,17 @@ class ReportGenerator:
                 "actual": r.actual,
                 "sent_hexdumps": [],
                 "received_hexdumps": [],
+                "log_entries": [],
             }
+            # Format log entries with readable timestamps
+            for entry in r.log_entries:
+                from datetime import datetime as dt
+                detail["log_entries"].append({
+                    "time": dt.fromtimestamp(entry.timestamp).strftime("%H:%M:%S.%f")[:-3],
+                    "level": entry.level,
+                    "source": entry.source,
+                    "message": entry.message,
+                })
             for frame in r.sent_frames:
                 if frame.raw_bytes:
                     detail["sent_hexdumps"].append({

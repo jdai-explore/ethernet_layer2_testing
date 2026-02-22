@@ -18,6 +18,7 @@ from typing import Any, Callable
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
 from src.core.session_manager import SessionManager
+from src.utils.log_capture import TestLogCapture
 from src.specs.spec_registry import SpecRegistry
 from src.models.test_case import (
     DUTProfile,
@@ -294,62 +295,70 @@ class TestRunner:
 
     async def _execute_case(self, case: TestCase) -> TestResult:
         """Execute a single test case within a managed session."""
-        logger.debug("Executing: %s", case.case_id)
 
-        try:
-            async with self.session.test_session() as session:
-                if not session.is_clean:
-                    return TestResult(
-                        case_id=case.case_id,
-                        spec_id=case.spec_id,
-                        tc8_reference=case.tc8_reference,
-                        section=case.section,
-                        status=TestStatus.ERROR,
-                        message="Session setup failed — DUT not in clean state",
-                    )
+        with TestLogCapture() as capture:
+            logger.debug("Executing: %s", case.case_id)
+            try:
+                async with self.session.test_session() as session:
+                    if not session.is_clean:
+                        result = TestResult(
+                            case_id=case.case_id,
+                            spec_id=case.spec_id,
+                            tc8_reference=case.tc8_reference,
+                            section=case.section,
+                            status=TestStatus.ERROR,
+                            message="Session setup failed — DUT not in clean state",
+                        )
+                        result.log_entries = capture.entries
+                        return result
 
-                # Try spec registry first (section-specific logic)
-                if self._spec_registry is not None and self._spec_registry.has_handler(case.section):
+                    # Try spec registry first (section-specific logic)
+                    if self._spec_registry is not None and self._spec_registry.has_handler(case.section):
+                        spec = self.config.spec_definitions.get(case.spec_id)
+                        if spec is not None:
+                            handler = self._spec_registry.get_handler(case.section)
+                            result = await handler.execute_spec(spec, case, self.interface)
+                            result.log_entries = capture.entries
+                            return result
+
+                    # Fallback: generic send/capture flow
+                    t0 = time.perf_counter()
+
+                    # Build and send frame
+                    sent_frames = await self._send_test_frame(case)
+
+                    # Capture responses on all ports
+                    received_frames = await self._capture_responses(case)
+
+                    duration_ms = (time.perf_counter() - t0) * 1000
+
+                    # Build expected outcome from spec
                     spec = self.config.spec_definitions.get(case.spec_id)
-                    if spec is not None:
-                        handler = self._spec_registry.get_handler(case.section)
-                        return await handler.execute_spec(spec, case, self.interface)
+                    expected = spec.expected_result if spec else {}
 
-                # Fallback: generic send/capture flow
-                t0 = time.perf_counter()
+                    # Add dynamic port expectations
+                    expected = self._build_dynamic_expected(case, expected)
 
-                # Build and send frame
-                sent_frames = await self._send_test_frame(case)
+                    # Validate
+                    result = self.validator.validate(
+                        case, sent_frames, received_frames, expected, duration_ms
+                    )
+                    result.log_entries = capture.entries
+                    return result
 
-                # Capture responses on all ports
-                received_frames = await self._capture_responses(case)
-
-                duration_ms = (time.perf_counter() - t0) * 1000
-
-                # Build expected outcome from spec
-                spec = self.config.spec_definitions.get(case.spec_id)
-                expected = spec.expected_result if spec else {}
-
-                # Add dynamic port expectations
-                expected = self._build_dynamic_expected(case, expected)
-
-                # Validate
-                result = self.validator.validate(
-                    case, sent_frames, received_frames, expected, duration_ms
+            except Exception as exc:
+                logger.exception("Error executing %s: %s", case.case_id, exc)
+                result = TestResult(
+                    case_id=case.case_id,
+                    spec_id=case.spec_id,
+                    tc8_reference=case.tc8_reference,
+                    section=case.section,
+                    status=TestStatus.ERROR,
+                    message=f"Framework error: {exc}",
+                    error_detail=str(exc),
                 )
+                result.log_entries = capture.entries
                 return result
-
-        except Exception as exc:
-            logger.exception("Error executing %s: %s", case.case_id, exc)
-            return TestResult(
-                case_id=case.case_id,
-                spec_id=case.spec_id,
-                tc8_reference=case.tc8_reference,
-                section=case.section,
-                status=TestStatus.ERROR,
-                message=f"Framework error: {exc}",
-                error_detail=str(exc),
-            )
 
 
     async def _send_test_frame(self, case: TestCase) -> list[FrameCapture]:
