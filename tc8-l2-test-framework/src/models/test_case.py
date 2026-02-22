@@ -214,12 +214,14 @@ class FrameCapture(BaseModel):
 
     port_id: int
     timestamp: float = Field(description="Capture timestamp (epoch seconds)")
-    raw_bytes: bytes | None = Field(default=None, exclude=True)
+    raw_bytes: bytes | None = Field(default=None, exclude=True, repr=False)
+    raw_hex: str = Field(default="", description="Hex-encoded frame bytes for JSON/DB storage")
     src_mac: str = Field(default="")
     dst_mac: str = Field(default="")
     ethertype: int = Field(default=0)
     vlan_tags: list[dict[str, Any]] = Field(default_factory=list)
     payload_size: int = Field(default=0)
+
 
 
 class TestResult(BaseModel):

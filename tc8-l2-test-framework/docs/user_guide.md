@@ -38,9 +38,15 @@ The TC8 Layer 2 Test Framework validates automotive Ethernet ECU switching behav
 ### Prerequisites
 
 - **Python 3.10+** (3.11 recommended)
-- **Operating System**: Linux (recommended) or Windows
+- **Operating System**: Linux (recommended), Windows, or macOS
 - **Network Access**: Direct Ethernet connection to DUT ports
 - **Permissions**: Root/admin for raw socket access (Linux: `sudo`, Windows: Run as Administrator)
+- **Packet Capture Driver** (required for Scapy):
+  - **Windows**: [Npcap](https://npcap.com/) — download and install with **"WinPcap API-compatible Mode"** enabled
+  - **Linux**: `sudo apt-get install libpcap-dev` (Debian/Ubuntu) or `sudo dnf install libpcap-devel` (RHEL/Fedora)
+  - **macOS**: Pre-installed; if issues, run `brew install libpcap`
+
+> ⚠️ **Without a packet capture driver, Scapy cannot send or sniff raw Ethernet frames.** The framework will start in simulation mode but real DUT testing requires this driver.
 
 ### Option 1: From Source
 
@@ -299,7 +305,7 @@ The 🗺️ **Topology** tab shows a live wiring diagram:
 - **Left box**: Test station interfaces with link status dots
 - **Right box**: DUT ports (from loaded profile)
 - **Wires**: Color-coded connections (🟢 active, 🔴 link down, gray dashed = unmapped)
-- **Auto-refresh**: Updates every 5 seconds
+- **Auto-refresh**: Updates every 5 seconds using OS-level interface status checks (`psutil`). **No packets are sent to the DUT** — the polling only reads the host NIC driver's link state, so it has zero impact on simulation or test execution.
 - **Hover tooltips**: Show MAC address, IP, VLAN membership, PVID
 
 ---
@@ -361,6 +367,26 @@ Actual: No frame received (timeout 500ms)
 ## Troubleshooting
 
 ### Common Issues
+
+#### Packet capture driver not installed
+
+Scapy requires a packet capture driver for raw Ethernet I/O:
+
+```bash
+# Windows — install Npcap from https://npcap.com/
+# Enable "WinPcap API-compatible Mode" during install
+
+# Linux (Debian/Ubuntu)
+sudo apt-get install libpcap-dev
+
+# Linux (RHEL/Fedora)
+sudo dnf install libpcap-devel
+
+# macOS (if needed)
+brew install libpcap
+```
+
+**Symptoms**: `OSError: No such device`, Scapy import errors, or `RuntimeError: Sniffing requires Npcap`.
 
 #### "No module named 'scapy'"
 ```bash

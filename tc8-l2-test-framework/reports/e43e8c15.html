@@ -1,0 +1,3734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TC8 Layer 2 Test Report — e43e8c15</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --color-pass: #22c55e;
+            --color-fail: #ef4444;
+            --color-info: #3b82f6;
+            --color-skip: #a3a3a3;
+            --color-error: #f59e0b;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #263548;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg); color: var(--text);
+            line-height: 1.6; padding: 2rem;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+        h2 { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: var(--text); }
+        .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+        .header-meta { text-align: right; font-size: 0.85rem; color: var(--text-dim); }
+
+        /* Summary Cards */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
+        .card .value { font-size: 1.8rem; font-weight: 700; }
+        .card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+        .card.pass .value { color: var(--color-pass); }
+        .card.fail .value { color: var(--color-fail); }
+        .card.info .value { color: var(--color-info); }
+        .card.skip .value { color: var(--color-skip); }
+        .card.error .value { color: var(--color-error); }
+
+        /* Progress Bar */
+        .progress-bar { height: 8px; border-radius: 4px; background: var(--surface); overflow: hidden; margin-bottom: 1.5rem; display: flex; }
+        .progress-bar .seg { height: 100%; }
+        .seg.pass { background: var(--color-pass); }
+        .seg.fail { background: var(--color-fail); }
+        .seg.info { background: var(--color-info); }
+        .seg.skip { background: var(--color-skip); }
+        .seg.error { background: var(--color-error); }
+
+        /* Charts Grid */
+        .charts-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; margin-bottom: 2rem; }
+        .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+        .chart-card h3 { font-size: 0.95rem; margin-bottom: 1rem; color: var(--text); }
+        .chart-wrapper { position: relative; max-height: 300px; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid var(--border); color: var(--text-dim); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        tr.clickable { cursor: pointer; }
+        tr.clickable:hover td { background: var(--surface-hover); }
+
+        /* Status badges */
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .badge.pass { background: rgba(34,197,94,0.15); color: var(--color-pass); }
+        .badge.fail { background: rgba(239,68,68,0.15); color: var(--color-fail); }
+        .badge.informational { background: rgba(59,130,246,0.15); color: var(--color-info); }
+        .badge.skip { background: rgba(163,163,163,0.15); color: var(--color-skip); }
+        .badge.error { background: rgba(245,158,11,0.15); color: var(--color-error); }
+
+        /* Section cards */
+        .section-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+        .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+        .section-card h3 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .section-card .stats { display: flex; gap: 0.75rem; font-size: 0.8rem; }
+        .section-card .stats span { display: flex; align-items: center; gap: 0.25rem; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .dot.pass { background: var(--color-pass); }
+        .dot.fail { background: var(--color-fail); }
+        .dot.info { background: var(--color-info); }
+
+        /* Toggle buttons */
+        .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .filter-btn { padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+        .filter-btn.active { background: rgba(96,165,250,0.15); color: #60a5fa; border-color: #60a5fa; }
+        .filter-btn:hover { background: var(--surface-hover); }
+
+        /* Detail panel */
+        .detail-row { display: none; }
+        .detail-row td { padding: 0; }
+        .detail-panel { background: #111827; border: 1px solid var(--border); border-radius: 6px; margin: 0.5rem 0.75rem 1rem; padding: 1rem; }
+        .detail-panel h4 { font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text); }
+        .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+        .diff-box { background: var(--surface); border-radius: 6px; padding: 0.75rem; }
+        .diff-box h5 { font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; }
+        .diff-box pre { font-family: 'Cascadia Code', monospace; font-size: 0.8rem; white-space: pre-wrap; color: var(--text); }
+
+        .message { color: var(--text-dim); font-size: 0.8rem; font-style: italic; }
+        .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim); text-align: center; }
+
+        /* Hexdump styles */
+        .hexdump { font-family: &#39;Cascadia Code&#39;, &#39;Fira Code&#39;, &#39;Consolas&#39;, monospace;
+  font-size: 0.8rem; line-height: 1.5; background: #0d1117;
+  color: #c9d1d9; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+.hx-offset { color: #6e7681; }
+.hx-dst    { color: #79c0ff; }
+.hx-src    { color: #a5d6ff; }
+.hx-etype  { color: #ffa657; font-weight: 600; }
+.hx-vlan   { color: #d2a8ff; }
+.hx-payload{ color: #8b949e; }
+.hx-ascii  { color: #7ee787; }
+
+
+        /* Print */
+        @media print {
+            body { background: white; color: #1a1a1a; padding: 1rem; }
+            .chart-card, .card { border-color: #ccc; background: #f9f9f9; }
+            .detail-row { display: table-row !important; }
+            .filter-bar { display: none; }
+            .badge { border: 1px solid currentColor; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>TC8 Layer 2 Test Report</h1>
+            <div class="subtitle">
+                OPEN Alliance TC8 v3.0 Compliance —
+                Example Central Gateway ECU
+            </div>
+        </div>
+        <div class="header-meta">
+            <div>Report: <strong>e43e8c15</strong></div>
+            <div>Tier: <strong>SMOKE</strong></div>
+            <div>Duration: <strong>420.8s</strong></div>
+            <div>2026-02-22T22:13:35</div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="cards">
+        <div class="card">
+            <div class="value">84</div>
+            <div class="label">Total</div>
+        </div>
+        <div class="card pass">
+            <div class="value">63</div>
+            <div class="label">Passed</div>
+        </div>
+        <div class="card fail">
+            <div class="value">21</div>
+            <div class="label">Failed</div>
+        </div>
+        <div class="card info">
+            <div class="value">0</div>
+            <div class="label">Info</div>
+        </div>
+        <div class="card skip">
+            <div class="value">0</div>
+            <div class="label">Skipped</div>
+        </div>
+        <div class="card error">
+            <div class="value">0</div>
+            <div class="label">Errors</div>
+        </div>
+        <div class="card pass">
+            <div class="value">75.0%</div>
+            <div class="label">Pass Rate</div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    
+    <div class="progress-bar">
+        <div class="seg pass" style="width:75.0%"></div>
+        <div class="seg fail" style="width:25.0%"></div>
+        <div class="seg info" style="width:0.0%"></div>
+        <div class="seg skip" style="width:0.0%"></div>
+        <div class="seg error" style="width:0.0%"></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>Pass / Fail Distribution</h3>
+            <div class="chart-wrapper">
+                <canvas id="doughnutChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Results by TC8 Section</h3>
+            <div class="chart-wrapper">
+                <canvas id="sectionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Breakdown -->
+    <h2>Section Breakdown</h2>
+    <div class="section-grid">
+        
+        <div class="section-card">
+            <h3>5.4 General</h3>
+            <div class="stats">
+                <span><span class="dot pass"></span> 42</span>
+                <span><span class="dot fail"></span> 0</span>
+                <span><span class="dot info"></span> 0</span>
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <h3>5.5 Address Learning</h3>
+            <div class="stats">
+                <span><span class="dot pass"></span> 0</span>
+                <span><span class="dot fail"></span> 21</span>
+                <span><span class="dot info"></span> 0</span>
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <h3>5.3 VLAN</h3>
+            <div class="stats">
+                <span><span class="dot pass"></span> 21</span>
+                <span><span class="dot fail"></span> 0</span>
+                <span><span class="dot info"></span> 0</span>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Failures -->
+    
+    <h2>⚠ Failures (21)</h2>
+    <table>
+        <thead>
+            <tr><th>Case ID</th><th>Spec</th><th>Section</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V1_UT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V1_ST_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V1_ST_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V1_ST_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V1_DT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V1_DT_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V1_DT_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V100_UT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V100_ST_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V100_ST_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V100_ST_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V100_DT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V100_DT_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V100_DT_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_UT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_ST_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_ST_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_ST_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_DT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_DT_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+            <tr>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_DT_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            
+        </tbody>
+    </table>
+    
+
+    <!-- Errors -->
+    
+
+    <!-- All Results with interactive toggles -->
+    <h2>All Results (84)</h2>
+    <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="pass">✅ Pass</button>
+        <button class="filter-btn" data-filter="fail">❌ Fail</button>
+        <button class="filter-btn" data-filter="informational">ℹ️ Info</button>
+        <button class="filter-btn" data-filter="skip">⏭️ Skip</button>
+        <button class="filter-btn" data-filter="error">💥 Error</button>
+    </div>
+    <table id="results-table">
+        <thead>
+            <tr><th>Status</th><th>Case ID</th><th>Spec</th><th>Section</th><th>Duration</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V1_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V1_UT_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-1">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V1_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V1_ST_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-2">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V1_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V1_ST_T88A8</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-3">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V1_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V1_ST_T9100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-4">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V1_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V1_DT_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-5">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V1_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V1_DT_T88A8</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-6">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V1_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V1_DT_T9100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-7">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V100_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V100_UT_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-8">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V100_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V100_ST_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-9">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V100_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V100_ST_T88A8</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-10">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V100_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V100_ST_T9100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-11">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V100_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V100_DT_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-12">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V100_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V100_DT_T88A8</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-13">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V100_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V100_DT_T9100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-14">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V4094_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V4094_UT_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-15">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V4094_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V4094_ST_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-16">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V4094_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V4094_ST_T88A8</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-17">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V4094_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V4094_ST_T9100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-18">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V4094_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V4094_DT_T8100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-19">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V4094_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V4094_DT_T88A8</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-20">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_001_P0_P1_V4094_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_001_P0_P1_V4094_DT_T9100</td>
+                <td>SWITCH_GEN_001</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-21">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V1_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V1_UT_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-22">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V1_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V1_ST_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-23">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V1_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V1_ST_T88A8</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-24">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V1_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V1_ST_T9100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-25">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V1_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V1_DT_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-26">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V1_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V1_DT_T88A8</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-27">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V1_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V1_DT_T9100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-28">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V100_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V100_UT_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-29">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V100_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V100_ST_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-30">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V100_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V100_ST_T88A8</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-31">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V100_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V100_ST_T9100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-32">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V100_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V100_DT_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-33">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V100_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V100_DT_T88A8</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-34">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V100_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V100_DT_T9100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-35">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V4094_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V4094_UT_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-36">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V4094_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V4094_ST_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-37">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V4094_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V4094_ST_T88A8</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-38">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V4094_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V4094_ST_T9100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-39">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V4094_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V4094_DT_T8100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-40">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V4094_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V4094_DT_T88A8</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-41">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_GEN_002_P0_P1_V4094_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_GEN_002_P0_P1_V4094_DT_T9100</td>
+                <td>SWITCH_GEN_002</td>
+                <td>5.4</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-42">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+strict_forwarding: False
+forward_to: all_ports
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;ff:ff:ff:ff:ff:ff&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V1_UT_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V1_UT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.1ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-43">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V1_ST_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V1_ST_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-44">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V1_ST_T88A8">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V1_ST_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-45">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V1_ST_T9100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V1_ST_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-46">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V1_DT_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V1_DT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.1ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-47">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V1_DT_T88A8">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V1_DT_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-48">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V1_DT_T9100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V1_DT_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-49">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V100_UT_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V100_UT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-50">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V100_ST_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V100_ST_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-51">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V100_ST_T88A8">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V100_ST_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-52">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V100_ST_T9100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V100_ST_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-53">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V100_DT_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V100_DT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-54">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V100_DT_T88A8">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V100_DT_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-55">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V100_DT_T9100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V100_DT_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-56">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V4094_UT_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_UT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-57">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V4094_ST_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_ST_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.1ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-58">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V4094_ST_T88A8">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_ST_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-59">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V4094_ST_T9100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_ST_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-60">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V4094_DT_T8100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_DT_T8100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.0ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-61">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V4094_DT_T88A8">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_DT_T88A8</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.1ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-62">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="fail" data-case="SWITCH_ADDR_001_P0_P1_V4094_DT_T9100">
+                <td><span class="badge fail">fail</span></td>
+                <td>SWITCH_ADDR_001_P0_P1_V4094_DT_T9100</td>
+                <td>SWITCH_ADDR_001</td>
+                <td>5.5</td>
+                <td>0.1ms</td>
+                <td class="message">FAIL: Frame leakage on port 2. </td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-63">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1]
+strict_forwarding: True
+forward_to: learned_port
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V1_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V1_UT_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-64">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+blocked_ports: []
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V1_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V1_ST_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-65">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+blocked_ports: []
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V1_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V1_ST_T88A8</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-66">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+blocked_ports: []
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V1_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V1_ST_T9100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-67">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+blocked_ports: []
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V1_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V1_DT_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-68">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+blocked_ports: []
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V1_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V1_DT_T88A8</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-69">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+blocked_ports: []
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V1_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V1_DT_T9100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-70">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: [1, 2, 3]
+blocked_ports: []
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>port_1: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_2: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+port_3: {&#39;frame_count&#39;: 1, &#39;src_macs&#39;: [&#39;02:00:00:00:00:01&#39;], &#39;dst_macs&#39;: [&#39;02:00:00:00:00:02&#39;], &#39;vlan_tags&#39;: []}
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V100_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V100_UT_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-71">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V100_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V100_ST_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-72">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V100_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V100_ST_T88A8</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-73">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V100_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V100_ST_T9100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-74">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V100_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V100_DT_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-75">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V100_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V100_DT_T88A8</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-76">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V100_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V100_DT_T9100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-77">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V4094_UT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V4094_UT_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-78">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V4094_ST_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V4094_ST_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-79">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V4094_ST_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V4094_ST_T88A8</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.1ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-80">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V4094_ST_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V4094_ST_T9100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-81">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V4094_DT_T8100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V4094_DT_T8100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-82">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V4094_DT_T88A8">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V4094_DT_T88A8</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-83">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="SWITCH_VLAN_001_P0_P1_V4094_DT_T9100">
+                <td><span class="badge pass">pass</span></td>
+                <td>SWITCH_VLAN_001_P0_P1_V4094_DT_T9100</td>
+                <td>SWITCH_VLAN_001</td>
+                <td>5.3</td>
+                <td>0.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-84">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>forward_to_ports: []
+blocked_ports: [1, 2, 3]
+strict_forwarding: True
+forward_to: member_ports_only
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre></pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+        </tbody>
+    </table>
+
+    <div class="footer">
+        TC8 L2 Test Framework v2.0.0 — Generated 2026-02-22T22:13:35
+    </div>
+</div>
+
+<script>
+// Chart data from template context
+const chartData = {&#34;summary&#34;: {&#34;pass&#34;: 63, &#34;fail&#34;: 21, &#34;info&#34;: 0, &#34;skip&#34;: 0, &#34;error&#34;: 0}, &#34;sections&#34;: [&#34;5.4 General&#34;, &#34;5.5 Address Learning&#34;, &#34;5.3 VLAN&#34;], &#34;section_pass&#34;: [42, 0, 21], &#34;section_fail&#34;: [0, 21, 0], &#34;section_info&#34;: [0, 0, 0], &#34;section_skip&#34;: [0, 0, 0], &#34;section_error&#34;: [0, 0, 0]};
+
+// --- Doughnut Chart ---
+const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
+new Chart(doughnutCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Pass', 'Fail', 'Informational', 'Skip', 'Error'],
+        datasets: [{
+            data: [
+                chartData.summary.pass,
+                chartData.summary.fail,
+                chartData.summary.info,
+                chartData.summary.skip,
+                chartData.summary.error,
+            ],
+            backgroundColor: ['#22c55e', '#ef4444', '#3b82f6', '#a3a3a3', '#f59e0b'],
+            borderColor: '#1e293b',
+            borderWidth: 2,
+        }],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
+        },
+        cutout: '60%',
+    },
+});
+
+// --- Section Bar Chart ---
+const sectionCtx = document.getElementById('sectionChart').getContext('2d');
+new Chart(sectionCtx, {
+    type: 'bar',
+    data: {
+        labels: chartData.sections,
+        datasets: [
+            { label: 'Pass', data: chartData.section_pass, backgroundColor: '#22c55e' },
+            { label: 'Fail', data: chartData.section_fail, backgroundColor: '#ef4444' },
+            { label: 'Info', data: chartData.section_info, backgroundColor: '#3b82f6' },
+            { label: 'Skip', data: chartData.section_skip, backgroundColor: '#a3a3a3' },
+            { label: 'Error', data: chartData.section_error, backgroundColor: '#f59e0b' },
+        ],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        indexAxis: 'y',
+        scales: {
+            x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+            y: { stacked: true, ticks: { color: '#e2e8f0', font: { size: 11 } }, grid: { display: false } },
+        },
+        plugins: {
+            legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
+        },
+    },
+});
+
+// --- Filter Buttons ---
+document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const filter = btn.dataset.filter;
+        document.querySelectorAll('.result-row').forEach(row => {
+            const status = row.dataset.status;
+            const show = filter === 'all' || status === filter;
+            row.style.display = show ? '' : 'none';
+            // Also hide detail row if parent hidden
+            const detailRow = row.nextElementSibling;
+            if (detailRow && detailRow.classList.contains('detail-row') && !show) {
+                detailRow.style.display = 'none';
+            }
+        });
+    });
+});
+
+// --- Click to expand/collapse detail rows ---
+document.querySelectorAll('.result-row').forEach(row => {
+    row.addEventListener('click', () => {
+        const detailRow = row.nextElementSibling;
+        if (detailRow && detailRow.classList.contains('detail-row')) {
+            const isVisible = detailRow.style.display === 'table-row';
+            detailRow.style.display = isVisible ? 'none' : 'table-row';
+        }
+    });
+});
+</script>
+</body>
+</html>

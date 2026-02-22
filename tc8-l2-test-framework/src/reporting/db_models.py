@@ -7,6 +7,7 @@ regression detection, and report retrieval.
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from typing import Any
@@ -90,11 +91,17 @@ class TestResultRecord(Base):
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Frame capture & comparison data (JSON text columns)
+    expected_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sent_frames_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    received_frames_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Relationship back to run
     run: Mapped[TestRunRecord] = relationship("TestRunRecord", back_populates="results")
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "case_id": self.case_id,
             "spec_id": self.spec_id,
             "tc8_reference": self.tc8_reference,
@@ -104,6 +111,12 @@ class TestResultRecord(Base):
             "message": self.message,
             "error_detail": self.error_detail,
         }
+        # Deserialize JSON columns if present
+        for key in ("expected_json", "actual_json", "sent_frames_json", "received_frames_json"):
+            raw = getattr(self, key, None)
+            dict_key = key.replace("_json", "")
+            result[dict_key] = json.loads(raw) if raw else None
+        return result
 
 
 def get_engine(database_url: str = "sqlite:///reports/test_results.db") -> Engine:

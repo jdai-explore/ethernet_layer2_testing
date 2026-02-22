@@ -23,6 +23,19 @@ A modular, open-architecture test framework for validating Layer 2 switching beh
 
 ## 🚀 Quick Start
 
+### Prerequisites: Packet Capture Driver
+
+Scapy requires a packet capture driver to send/receive raw Ethernet frames:
+
+| OS | Required Package | Install Command |
+|----|-----------------|-----------------|
+| **Windows** | [Npcap](https://npcap.com/) (recommended) or WinPcap | Download from https://npcap.com/#download — install with **"WinPcap API-compatible Mode"** enabled |
+| **Linux (Debian/Ubuntu)** | libpcap-dev | `sudo apt-get install libpcap-dev` |
+| **Linux (RHEL/Fedora)** | libpcap-devel | `sudo dnf install libpcap-devel` |
+| **macOS** | libpcap (pre-installed) | Usually no action needed; if issues: `brew install libpcap` |
+
+> ⚠️ **Without a packet capture driver, Scapy will fail to send or sniff Ethernet frames.** The framework will still start but DUT communication will not work.
+
 ### Installation
 
 #### Option 1: Automated Setup (Recommended)

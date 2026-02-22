@@ -35,8 +35,16 @@ ports:
   - 1
   pvid: 1
   is_trunk: false
+supported_features:
+- vlan
+- address_learning
+- filtering
+- qos
+- configuration
 max_mac_table_size: 1024
 mac_aging_time_s: 300
 supports_double_tagging: true
 supports_gptp: true
 can_reset: true
+reset_command: null
+notes: ''

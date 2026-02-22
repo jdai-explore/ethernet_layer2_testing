@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TC8 Layer 2 Test Report — {{ report.report_id }}</title>
+    <title>TC8 Layer 2 Test Report — test-vis-002</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <style>
         :root {
@@ -107,7 +107,17 @@
         .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim); text-align: center; }
 
         /* Hexdump styles */
-        {{ hexdump_css }}
+        .hexdump { font-family: &#39;Cascadia Code&#39;, &#39;Fira Code&#39;, &#39;Consolas&#39;, monospace;
+  font-size: 0.8rem; line-height: 1.5; background: #0d1117;
+  color: #c9d1d9; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+.hx-offset { color: #6e7681; }
+.hx-dst    { color: #79c0ff; }
+.hx-src    { color: #a5d6ff; }
+.hx-etype  { color: #ffa657; font-weight: 600; }
+.hx-vlan   { color: #d2a8ff; }
+.hx-payload{ color: #8b949e; }
+.hx-ascii  { color: #7ee787; }
+
 
         /* Print */
         @media print {
@@ -126,58 +136,58 @@
         <div>
             <h1>TC8 Layer 2 Test Report</h1>
             <div class="subtitle">
-                OPEN Alliance TC8 v{{ tc8_version }} Compliance —
-                {% if report.dut_profile %}{{ report.dut_profile.name }}{% else %}Unknown DUT{% endif %}
+                OPEN Alliance TC8 v3.0 Compliance —
+                Test ECU
             </div>
         </div>
         <div class="header-meta">
-            <div>Report: <strong>{{ report.report_id }}</strong></div>
-            <div>Tier: <strong>{{ report.tier.value | upper }}</strong></div>
-            <div>Duration: <strong>{{ "%.1f" | format(report.duration_s) }}s</strong></div>
-            <div>{{ generated_at }}</div>
+            <div>Report: <strong>test-vis-002</strong></div>
+            <div>Tier: <strong>SMOKE</strong></div>
+            <div>Duration: <strong>5.3s</strong></div>
+            <div>2026-02-22T22:11:14</div>
         </div>
     </div>
 
     <!-- Summary Cards -->
     <div class="cards">
         <div class="card">
-            <div class="value">{{ report.total_cases }}</div>
+            <div class="value">10</div>
             <div class="label">Total</div>
         </div>
         <div class="card pass">
-            <div class="value">{{ report.passed }}</div>
+            <div class="value">6</div>
             <div class="label">Passed</div>
         </div>
         <div class="card fail">
-            <div class="value">{{ report.failed }}</div>
+            <div class="value">2</div>
             <div class="label">Failed</div>
         </div>
         <div class="card info">
-            <div class="value">{{ report.informational }}</div>
+            <div class="value">1</div>
             <div class="label">Info</div>
         </div>
         <div class="card skip">
-            <div class="value">{{ report.skipped }}</div>
+            <div class="value">0</div>
             <div class="label">Skipped</div>
         </div>
         <div class="card error">
-            <div class="value">{{ report.errors }}</div>
+            <div class="value">1</div>
             <div class="label">Errors</div>
         </div>
         <div class="card pass">
-            <div class="value">{{ pass_rate }}%</div>
+            <div class="value">60.0%</div>
             <div class="label">Pass Rate</div>
         </div>
     </div>
 
     <!-- Progress Bar -->
-    {% set total = report.total_cases if report.total_cases > 0 else 1 %}
+    
     <div class="progress-bar">
-        <div class="seg pass" style="width:{{ (report.passed / total * 100) | round(1) }}%"></div>
-        <div class="seg fail" style="width:{{ (report.failed / total * 100) | round(1) }}%"></div>
-        <div class="seg info" style="width:{{ (report.informational / total * 100) | round(1) }}%"></div>
-        <div class="seg skip" style="width:{{ (report.skipped / total * 100) | round(1) }}%"></div>
-        <div class="seg error" style="width:{{ (report.errors / total * 100) | round(1) }}%"></div>
+        <div class="seg pass" style="width:60.0%"></div>
+        <div class="seg fail" style="width:20.0%"></div>
+        <div class="seg info" style="width:10.0%"></div>
+        <div class="seg skip" style="width:0.0%"></div>
+        <div class="seg error" style="width:10.0%"></div>
     </div>
 
     <!-- Charts -->
@@ -199,59 +209,52 @@
     <!-- Section Breakdown -->
     <h2>Section Breakdown</h2>
     <div class="section-grid">
-        {% for sec_name, stats in section_stats.items() %}
+        
         <div class="section-card">
-            <h3>{{ sec_name }}</h3>
+            <h3>5.3 VLAN</h3>
             <div class="stats">
-                <span><span class="dot pass"></span> {{ stats.pass }}</span>
-                <span><span class="dot fail"></span> {{ stats.fail }}</span>
-                <span><span class="dot info"></span> {{ stats.info }}</span>
+                <span><span class="dot pass"></span> 1</span>
+                <span><span class="dot fail"></span> 1</span>
+                <span><span class="dot info"></span> 0</span>
             </div>
         </div>
-        {% endfor %}
+        
+        <div class="section-card">
+            <h3>5.4 General</h3>
+            <div class="stats">
+                <span><span class="dot pass"></span> 1</span>
+                <span><span class="dot fail"></span> 0</span>
+                <span><span class="dot info"></span> 1</span>
+            </div>
+        </div>
+        
     </div>
 
     <!-- Failures -->
-    {% if failures %}
-    <h2>⚠ Failures ({{ failures | length }})</h2>
+    
+    <h2>⚠ Failures (1)</h2>
     <table>
         <thead>
             <tr><th>Case ID</th><th>Spec</th><th>Section</th><th>Message</th></tr>
         </thead>
         <tbody>
-            {% for r in failures %}
+            
             <tr>
-                <td>{{ r.case_id }}</td>
-                <td>{{ r.spec_id }}</td>
-                <td>{{ r.section.value if r.section else '-' }}</td>
-                <td class="message">{{ r.message or 'No details' }}</td>
+                <td>TC_VLAN_002</td>
+                <td>SPEC_002</td>
+                <td>5.3</td>
+                <td class="message">VLAN tag mismatch</td>
             </tr>
-            {% endfor %}
+            
         </tbody>
     </table>
-    {% endif %}
+    
 
     <!-- Errors -->
-    {% if errors %}
-    <h2>🔴 Errors ({{ errors | length }})</h2>
-    <table>
-        <thead>
-            <tr><th>Case ID</th><th>Spec</th><th>Message</th></tr>
-        </thead>
-        <tbody>
-            {% for r in errors %}
-            <tr>
-                <td>{{ r.case_id }}</td>
-                <td>{{ r.spec_id }}</td>
-                <td class="message">{{ r.message or r.error_detail or 'Unknown error' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
+    
 
     <!-- All Results with interactive toggles -->
-    <h2>All Results ({{ report.results | length }})</h2>
+    <h2>All Results (4)</h2>
     <div class="filter-bar">
         <button class="filter-btn active" data-filter="all">All</button>
         <button class="filter-btn" data-filter="pass">✅ Pass</button>
@@ -265,77 +268,148 @@
             <tr><th>Status</th><th>Case ID</th><th>Spec</th><th>Section</th><th>Duration</th><th>Message</th></tr>
         </thead>
         <tbody>
-            {% for r in report.results %}
-            <tr class="clickable result-row" data-status="{{ r.status.value }}" data-case="{{ r.case_id }}">
-                <td><span class="badge {{ r.status.value }}">{{ r.status.value }}</span></td>
-                <td>{{ r.case_id }}</td>
-                <td>{{ r.spec_id }}</td>
-                <td>{{ r.section.value if r.section else '-' }}</td>
-                <td>{{ "%.1f" | format(r.duration_ms) }}ms</td>
-                <td class="message">{{ r.message or '' }}</td>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="TC_VLAN_001">
+                <td><span class="badge pass">pass</span></td>
+                <td>TC_VLAN_001</td>
+                <td>SPEC_001</td>
+                <td>5.3</td>
+                <td>120.0ms</td>
+                <td class="message"></td>
             </tr>
             <!-- Detail panel (initially hidden) -->
-            <tr class="detail-row" id="detail-{{ loop.index }}">
+            <tr class="detail-row" id="detail-1">
                 <td colspan="6">
                     <div class="detail-panel">
-                        {% set detail = result_details.get(r.case_id, {}) %}
-                        {% if detail.get('expected') or detail.get('actual') %}
+                        
+                        
                         <h4>Expected vs Actual</h4>
                         <div class="diff-grid">
                             <div class="diff-box">
                                 <h5>Expected</h5>
-                                <pre>{% for k, v in (detail.get('expected') or {}).items() %}{{ k }}: {{ v }}
-{% endfor %}</pre>
+                                <pre>vlan_id: 100
+</pre>
                             </div>
                             <div class="diff-box">
                                 <h5>Actual</h5>
-                                <pre>{% for k, v in (detail.get('actual') or {}).items() %}{{ k }}: {{ v }}
-{% endfor %}</pre>
+                                <pre>vlan_id: 100
+</pre>
                             </div>
                         </div>
-                        {% endif %}
-                        {% if detail.get('sent_hexdumps') %}
+                        
+                        
                         <h4>Sent Frames</h4>
-                        {% for frame in detail.sent_hexdumps %}
+                        
                         <details>
                             <summary style="cursor:pointer;color:#60a5fa;font-size:0.85rem;margin-bottom:0.5rem">
-                                Port {{ frame.port }} — {{ frame.summary.src_mac }} → {{ frame.summary.dst_mac }}
-                                ({{ frame.summary.ethertype_name }}, {{ frame.summary.total_len }} bytes)
+                                Port 1 — 02:00:00:00:00:02 → 02:00:00:00:00:01
+                                (IPv4, 60 bytes)
                             </summary>
-                            {{ frame.hex_html }}
+                            &lt;pre class=&#34;hexdump&#34;&gt;&lt;span class=&#34;hx-offset&#34;&gt;0000&lt;/span&gt;  &lt;span class=&#34;hx-dst&#34;&gt;02&lt;/span&gt; &lt;span class=&#34;hx-dst&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-dst&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-dst&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-dst&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-dst&#34;&gt;01&lt;/span&gt; &lt;span class=&#34;hx-src&#34;&gt;02&lt;/span&gt; &lt;span class=&#34;hx-src&#34;&gt;00&lt;/span&gt;   &lt;span class=&#34;hx-src&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-src&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-src&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-src&#34;&gt;02&lt;/span&gt; &lt;span class=&#34;hx-etype&#34;&gt;08&lt;/span&gt; &lt;span class=&#34;hx-etype&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt;  &lt;span class=&#34;hx-ascii&#34;&gt;|................|&lt;/span&gt;
+&lt;span class=&#34;hx-offset&#34;&gt;0010&lt;/span&gt;  &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt;   &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt;  &lt;span class=&#34;hx-ascii&#34;&gt;|................|&lt;/span&gt;
+&lt;span class=&#34;hx-offset&#34;&gt;0020&lt;/span&gt;  &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt;   &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt;  &lt;span class=&#34;hx-ascii&#34;&gt;|................|&lt;/span&gt;
+&lt;span class=&#34;hx-offset&#34;&gt;0030&lt;/span&gt;  &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt;   &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt; &lt;span class=&#34;hx-payload&#34;&gt;00&lt;/span&gt;  &lt;span class=&#34;hx-ascii&#34;&gt;|............|&lt;/span&gt;&lt;/pre&gt;
                         </details>
-                        {% endfor %}
-                        {% endif %}
-                        {% if detail.get('received_hexdumps') %}
-                        <h4>Received Frames</h4>
-                        {% for frame in detail.received_hexdumps %}
-                        <details>
-                            <summary style="cursor:pointer;color:#60a5fa;font-size:0.85rem;margin-bottom:0.5rem">
-                                Port {{ frame.port }} — {{ frame.summary.src_mac }} → {{ frame.summary.dst_mac }}
-                                ({{ frame.summary.ethertype_name }}, {{ frame.summary.total_len }} bytes)
-                            </summary>
-                            {{ frame.hex_html }}
-                        </details>
-                        {% endfor %}
-                        {% endif %}
-                        {% if not detail.get('sent_hexdumps') and not detail.get('received_hexdumps') and not detail.get('expected') and not detail.get('actual') %}
-                        <p style="color:var(--text-dim);font-size:0.85rem">No frame capture data available for this result.</p>
-                        {% endif %}
+                        
+                        
+                        
+                        
                     </div>
                 </td>
             </tr>
-            {% endfor %}
+            
+            <tr class="clickable result-row" data-status="fail" data-case="TC_VLAN_002">
+                <td><span class="badge fail">fail</span></td>
+                <td>TC_VLAN_002</td>
+                <td>SPEC_002</td>
+                <td>5.3</td>
+                <td>85.0ms</td>
+                <td class="message">VLAN tag mismatch</td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-2">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        <h4>Expected vs Actual</h4>
+                        <div class="diff-grid">
+                            <div class="diff-box">
+                                <h5>Expected</h5>
+                                <pre>vlan_id: 200
+</pre>
+                            </div>
+                            <div class="diff-box">
+                                <h5>Actual</h5>
+                                <pre>vlan_id: 201
+</pre>
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="pass" data-case="TC_GEN_001">
+                <td><span class="badge pass">pass</span></td>
+                <td>TC_GEN_001</td>
+                <td>SPEC_010</td>
+                <td>5.4</td>
+                <td>45.0ms</td>
+                <td class="message"></td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-3">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        
+                        
+                        
+                        <p style="color:var(--text-dim);font-size:0.85rem">No frame capture data available for this result.</p>
+                        
+                    </div>
+                </td>
+            </tr>
+            
+            <tr class="clickable result-row" data-status="informational" data-case="TC_GEN_002">
+                <td><span class="badge informational">informational</span></td>
+                <td>TC_GEN_002</td>
+                <td>SPEC_011</td>
+                <td>5.4</td>
+                <td>30.0ms</td>
+                <td class="message">Frame forwarded correctly (informational)</td>
+            </tr>
+            <!-- Detail panel (initially hidden) -->
+            <tr class="detail-row" id="detail-4">
+                <td colspan="6">
+                    <div class="detail-panel">
+                        
+                        
+                        
+                        
+                        
+                        <p style="color:var(--text-dim);font-size:0.85rem">No frame capture data available for this result.</p>
+                        
+                    </div>
+                </td>
+            </tr>
+            
         </tbody>
     </table>
 
     <div class="footer">
-        TC8 L2 Test Framework v{{ framework_version }} — Generated {{ generated_at }}
+        TC8 L2 Test Framework v2.0.0 — Generated 2026-02-22T22:11:14
     </div>
 </div>
 
 <script>
 // Chart data from template context
-const chartData = {{ chart_data_json }};
+const chartData = {&#34;summary&#34;: {&#34;pass&#34;: 6, &#34;fail&#34;: 2, &#34;info&#34;: 1, &#34;skip&#34;: 0, &#34;error&#34;: 1}, &#34;sections&#34;: [&#34;5.3 VLAN&#34;, &#34;5.4 General&#34;], &#34;section_pass&#34;: [1, 1], &#34;section_fail&#34;: [1, 0], &#34;section_info&#34;: [0, 1], &#34;section_skip&#34;: [0, 0], &#34;section_error&#34;: [0, 0]};
 
 // --- Doughnut Chart ---
 const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');

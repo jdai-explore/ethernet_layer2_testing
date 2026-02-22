@@ -27,7 +27,7 @@ import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
@@ -144,6 +144,13 @@ class DUTProfileRequest(BaseModel):
     double_tagging: bool = False
     gptp: bool = False
     can_reset: bool = False
+    reset_command: str | None = None
+    supported_features: list[str] = Field(
+        default_factory=lambda: [
+            "vlan", "address_learning", "filtering", "qos", "configuration"
+        ]
+    )
+    notes: str = ""
     ports: list[dict[str, Any]] | None = None
 
 
@@ -339,11 +346,14 @@ async def create_dut_profile(request: DUTProfileRequest) -> dict[str, Any]:
         "firmware_version": request.firmware,
         "port_count": request.port_count,
         "ports": ports_data,
+        "supported_features": request.supported_features,
         "max_mac_table_size": request.mac_table_size,
         "mac_aging_time_s": request.mac_aging_time,
         "supports_double_tagging": request.double_tagging,
         "supports_gptp": request.gptp,
         "can_reset": request.can_reset,
+        "reset_command": request.reset_command,
+        "notes": request.notes,
     }
 
     # Save YAML
@@ -388,11 +398,14 @@ async def update_dut_profile(name: str, request: DUTProfileRequest) -> dict[str,
         "firmware_version": request.firmware,
         "port_count": request.port_count,
         "ports": ports_data,
+        "supported_features": request.supported_features,
         "max_mac_table_size": request.mac_table_size,
         "mac_aging_time_s": request.mac_aging_time,
         "supports_double_tagging": request.double_tagging,
         "supports_gptp": request.gptp,
         "can_reset": request.can_reset,
+        "reset_command": request.reset_command,
+        "notes": request.notes,
     }
 
     profile_path.write_text(yaml.dump(profile_data, default_flow_style=False, sort_keys=False), encoding="utf-8")
@@ -622,6 +635,79 @@ async def get_report_html(report_id: str) -> str:
     raise HTTPException(status_code=404, detail=f"HTML report for '{report_id}' not found")
 
 
+@app.get("/api/reports/{report_id}/chart-data")
+async def get_report_chart_data(report_id: str) -> dict[str, Any]:
+    """Chart-optimized JSON for a report: summary counts + per-section breakdown."""
+    run = result_store.get_run(report_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"Report '{report_id}' not found")
+
+    # Aggregate summary
+    summary = {"pass": 0, "fail": 0, "info": 0, "skip": 0, "error": 0}
+    by_section: dict[str, dict[str, int]] = {}
+    duration_by_section: dict[str, list[float]] = {}
+
+    section_labels = {
+        "5.3": "5.3 VLAN", "5.4": "5.4 General", "5.5": "5.5 Address Learning",
+        "5.6": "5.6 Filtering", "5.7": "5.7 Time Sync", "5.8": "5.8 QoS",
+        "5.9": "5.9 Configuration",
+    }
+
+    for r in run.get("results", []):
+        status = r.get("status", "")
+        section_raw = r.get("section", "unknown")
+        section = section_labels.get(section_raw, section_raw)
+        dur = r.get("duration_ms", 0.0)
+
+        status_key = {
+            "pass": "pass", "fail": "fail", "informational": "info",
+            "skip": "skip", "error": "error",
+        }.get(status, "error")
+
+        summary[status_key] += 1
+
+        if section not in by_section:
+            by_section[section] = {"pass": 0, "fail": 0, "info": 0, "skip": 0, "error": 0}
+        by_section[section][status_key] += 1
+
+        duration_by_section.setdefault(section, []).append(dur)
+
+    # Build section arrays in deterministic order
+    section_order = list(section_labels.values())
+    by_section_list = []
+    duration_list = []
+    for sec in section_order:
+        if sec in by_section:
+            by_section_list.append({"section": sec, **by_section[sec]})
+            durs = duration_by_section.get(sec, [0.0])
+            duration_list.append({
+                "section": sec,
+                "avg_ms": round(sum(durs) / len(durs), 2) if durs else 0.0,
+                "max_ms": round(max(durs), 2) if durs else 0.0,
+            })
+
+    return {
+        "report_id": report_id,
+        "summary": summary,
+        "by_section": by_section_list,
+        "duration_by_section": duration_list,
+    }
+
+
+@app.get("/api/reports/{report_id}/results/{case_id}")
+async def get_result_detail(report_id: str, case_id: str) -> dict[str, Any]:
+    """Full detail for a single test result including frame captures."""
+    run = result_store.get_run(report_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"Report '{report_id}' not found")
+
+    for r in run.get("results", []):
+        if r.get("case_id") == case_id:
+            return r
+
+    raise HTTPException(status_code=404, detail=f"Result '{case_id}' not found in report '{report_id}'")
+
+
 @app.get("/api/trend/{spec_id}")
 async def get_trend(spec_id: str, last_n: int = 10) -> dict[str, Any]:
     """Get pass/fail trend for a specific spec across recent runs."""
@@ -715,6 +801,7 @@ async def index() -> str:
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>TC8 L2 Test Framework</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -1033,6 +1120,23 @@ async def index() -> str:
                     <div class="section-chip">5.8 QoS <span class="count">4</span></div>
                     <div class="section-chip">5.9 Configuration <span class="count">3</span></div>
                 </div>
+
+                <!-- Dashboard Charts -->
+                <div id="dashboard-charts" style="display:grid;grid-template-columns:1fr 2fr;gap:1rem;margin-bottom:1.25rem">
+                    <div class="panel" style="margin-bottom:0">
+                        <h3 style="font-size:0.9rem;margin-bottom:0.75rem">Pass / Fail Distribution</h3>
+                        <div style="max-height:260px;position:relative">
+                            <canvas id="dash-doughnut"></canvas>
+                        </div>
+                    </div>
+                    <div class="panel" style="margin-bottom:0">
+                        <h3 style="font-size:0.9rem;margin-bottom:0.75rem">Results by TC8 Section</h3>
+                        <div style="max-height:260px;position:relative">
+                            <canvas id="dash-section-bar"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="panel">
                     <h2>📊 Recent Test Runs</h2>
                     <table>
@@ -1051,35 +1155,7 @@ async def index() -> str:
                 </div>
             </div>
 
-            <!-- ═══ Tab 2: Topology ═══ -->
-            <div class="tab-content" id="tab-topology">
-                <div class="panel">
-                    <h2>🗺️ Network Topology</h2>
-                    <p style="font-size:0.78rem;color:#94a3b8;margin-bottom:0.4rem">
-                        Live view of test station ↔ DUT connections. Auto-refreshes every 5 seconds.
-                    </p>
-                    <div class="topo-mode-bar">
-                        <span class="mode-badge simulation" id="topo-mode-badge">
-                            <span class="mode-dot"></span> <span id="topo-mode-text">SIMULATION</span>
-                        </span>
-                    </div>
-                    <div class="topo-container" id="topo-diagram">
-                        <div class="topo-box" id="topo-station-box">
-                            <h3>🖥️ Test Station</h3>
-                            <div id="topo-station-ports"><span style="color:#64748b;font-size:0.78rem">Detecting…</span></div>
-                        </div>
-                        <div class="topo-wires" id="topo-wires">
-                        </div>
-                        <div class="topo-box" id="topo-dut-box">
-                            <h3>🔲 <span id="topo-dut-name">DUT</span></h3>
-                            <div id="topo-dut-ports"><span style="color:#64748b;font-size:0.78rem">No DUT loaded</span></div>
-                        </div>
-                    </div>
-                    <div class="topo-summary" id="topo-summary"></div>
-                </div>
-            </div>
-
-            <!-- ═══ Tab 3: DUT Configuration ═══ -->
+            <!-- ═══ Tab 2: DUT Configuration ═══ -->
             <div class="tab-content" id="tab-dut-config">
                 <div class="panel">
                     <h2>🔧 DUT Profile Configuration</h2>
@@ -1118,7 +1194,27 @@ async def index() -> str:
                             <div class="form-group full">
                                 <div class="toggle-row"><input type="checkbox" id="dut-double-tag"><span>Supports Double-Tagging (802.1ad)</span></div>
                                 <div class="toggle-row"><input type="checkbox" id="dut-gptp"><span>Supports gPTP (IEEE 802.1AS)</span></div>
-                                <div class="toggle-row"><input type="checkbox" id="dut-reset"><span>Can power-cycle / reset between tests</span></div>
+                                <div class="toggle-row"><input type="checkbox" id="dut-reset" onchange="document.getElementById('reset-cmd-group').style.display=this.checked?'flex':'none'"><span>Can power-cycle / reset between tests</span></div>
+                            </div>
+                            <div class="form-group full" id="reset-cmd-group" style="display:none">
+                                <label>Reset Command</label>
+                                <input type="text" id="dut-reset-cmd" placeholder="e.g. ssh ecu@192.168.1.100 'reboot'">
+                            </div>
+                            <div class="form-group full">
+                                <label>Supported Features (determines which TC8 test sections run)</label>
+                                <div style="display:flex;flex-wrap:wrap;gap:0.7rem;margin-top:0.3rem">
+                                    <div class="toggle-row"><input type="checkbox" class="feat-check" value="vlan" checked><span>VLAN (5.3)</span></div>
+                                    <div class="toggle-row"><input type="checkbox" class="feat-check" value="general" checked><span>General (5.4)</span></div>
+                                    <div class="toggle-row"><input type="checkbox" class="feat-check" value="address_learning" checked><span>Address Learning (5.5)</span></div>
+                                    <div class="toggle-row"><input type="checkbox" class="feat-check" value="filtering" checked><span>Filtering (5.6)</span></div>
+                                    <div class="toggle-row"><input type="checkbox" class="feat-check" value="time_sync"><span>Time Sync (5.7)</span></div>
+                                    <div class="toggle-row"><input type="checkbox" class="feat-check" value="qos" checked><span>QoS (5.8)</span></div>
+                                    <div class="toggle-row"><input type="checkbox" class="feat-check" value="configuration" checked><span>Configuration (5.9)</span></div>
+                                </div>
+                            </div>
+                            <div class="form-group full">
+                                <label>Notes</label>
+                                <textarea id="dut-notes" rows="3" style="background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.78rem;resize:vertical" placeholder="Free-text notes about this DUT (optional)"></textarea>
                             </div>
                         </div>
                         <!-- Per-Port Interface Mapping -->
@@ -1148,7 +1244,48 @@ async def index() -> str:
                 </div>
             </div>
 
-            <!-- ═══ Tab 4: Run Tests ═══ -->
+            <!-- ═══ Tab 3: Topology ═══ -->
+            <div class="tab-content" id="tab-topology">
+                <div class="panel">
+                    <h2>🗺️ Network Topology</h2>
+                    <p style="font-size:0.78rem;color:#94a3b8;margin-bottom:0.4rem">
+                        Live view of test station ↔ DUT connections. Auto-refreshes every 5 seconds.
+                    </p>
+                    <div class="topo-mode-bar">
+                        <span class="mode-badge simulation" id="topo-mode-badge">
+                            <span class="mode-dot"></span> <span id="topo-mode-text">SIMULATION</span>
+                        </span>
+                    </div>
+                    <div class="topo-container" id="topo-diagram">
+                        <div class="topo-box" id="topo-station-box">
+                            <h3>🖥️ Test Station</h3>
+                            <div id="topo-station-ports"><span style="color:#64748b;font-size:0.78rem">Detecting…</span></div>
+                        </div>
+                        <div class="topo-wires" id="topo-wires">
+                        </div>
+                        <div class="topo-box" id="topo-dut-box">
+                            <h3>🔲 <span id="topo-dut-name">DUT</span></h3>
+                            <div id="topo-dut-ports"><span style="color:#64748b;font-size:0.78rem">No DUT loaded</span></div>
+                        </div>
+                    </div>
+                    <div class="topo-summary" id="topo-summary"></div>
+                </div>
+            </div>
+
+            <!-- ═══ Tab 4: Pre-flight Checks ═══ -->
+            <div class="tab-content" id="tab-preflight">
+                <div class="panel">
+                    <h2>🩺 Framework Self-Validation</h2>
+                    <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:0.8rem">
+                        Run internal checks to verify the framework is ready for testing.
+                    </p>
+                    <button class="btn btn-primary" id="btn-preflight" onclick="runPreflight()">🔍 Run Checks</button>
+                    <div id="preflight-list" style="margin-top:0.8rem"></div>
+                    <div id="preflight-summary" class="status-msg" style="margin-top:0.6rem"></div>
+                </div>
+            </div>
+
+            <!-- ═══ Tab 5: Run Tests ═══ -->
             <div class="tab-content" id="tab-run-tests">
                 <div class="sim-warning" id="run-sim-warning">
                     ⚠️ Running in <strong>SIMULATION</strong> mode — no real hardware detected. Results will not reflect actual DUT behavior.
@@ -1195,19 +1332,6 @@ async def index() -> str:
                         <div class="progress-text" id="run-progress-text">Waiting…</div>
                     </div>
                     <div id="run-result" class="status-msg"></div>
-                </div>
-            </div>
-
-            <!-- ═══ Tab 5: Pre-flight Checks ═══ -->
-            <div class="tab-content" id="tab-preflight">
-                <div class="panel">
-                    <h2>🩺 Framework Self-Validation</h2>
-                    <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:0.8rem">
-                        Run internal checks to verify the framework is ready for testing.
-                    </p>
-                    <button class="btn btn-primary" id="btn-preflight" onclick="runPreflight()">🔍 Run Checks</button>
-                    <div id="preflight-list" style="margin-top:0.8rem"></div>
-                    <div id="preflight-summary" class="status-msg" style="margin-top:0.6rem"></div>
                 </div>
             </div>
 
@@ -1344,6 +1468,16 @@ async def index() -> str:
                 document.getElementById('dut-double-tag').checked = d.supports_double_tagging || false;
                 document.getElementById('dut-gptp').checked = d.supports_gptp || false;
                 document.getElementById('dut-reset').checked = d.can_reset || false;
+                // Populate reset command (show field if can_reset is true)
+                document.getElementById('dut-reset-cmd').value = d.reset_command || '';
+                document.getElementById('reset-cmd-group').style.display = d.can_reset ? 'flex' : 'none';
+                // Populate supported features checkboxes
+                const feats = d.supported_features || ['vlan', 'address_learning', 'filtering', 'qos', 'configuration'];
+                document.querySelectorAll('.feat-check').forEach(cb => {{
+                    cb.checked = feats.includes(cb.value);
+                }});
+                // Populate notes
+                document.getElementById('dut-notes').value = d.notes || '';
                 // Rebuild port table with loaded data
                 await fetchInterfaces();
                 rebuildPortTable(d.ports || []);
@@ -1366,6 +1500,9 @@ async def index() -> str:
                 double_tagging: document.getElementById('dut-double-tag').checked,
                 gptp: document.getElementById('dut-gptp').checked,
                 can_reset: document.getElementById('dut-reset').checked,
+                reset_command: document.getElementById('dut-reset-cmd').value || null,
+                supported_features: Array.from(document.querySelectorAll('.feat-check:checked')).map(cb => cb.value),
+                notes: document.getElementById('dut-notes').value,
                 ports: collectPortData(),
             }};
             try {{
@@ -1473,7 +1610,10 @@ async def index() -> str:
             if (warn) warn.style.display = mode === 'simulation' ? 'block' : 'none';
         }}
 
-        // Start topology auto-refresh
+        // Start topology auto-refresh.
+        // NOTE: This polling calls /api/topology which uses psutil.net_if_stats()
+        // — a LOCAL OS API call that reads NIC link state from the OS driver.
+        // No packets are sent to the DUT; zero impact on simulation or test execution.
         refreshTopology();
         topoInterval = setInterval(refreshTopology, 5000);
 
@@ -1639,6 +1779,67 @@ async def index() -> str:
         document.querySelector('[data-tab="console"]').addEventListener('click', () => {{
             if (!logWs || logWs.readyState > 1) connectLogs();
         }});
+
+        // ── Dashboard Charts (auto-load latest report) ──
+        (async function loadDashboardCharts() {{
+            try {{
+                const reportsRes = await fetch('/api/reports?limit=1');
+                const reportsData = await reportsRes.json();
+                if (!reportsData.reports || !reportsData.reports.length) {{
+                    document.getElementById('dashboard-charts').style.display = 'none';
+                    return;
+                }}
+                const latestId = reportsData.reports[0].report_id;
+                const chartRes = await fetch('/api/reports/' + latestId + '/chart-data');
+                const cd = await chartRes.json();
+
+                // Doughnut
+                new Chart(document.getElementById('dash-doughnut').getContext('2d'), {{
+                    type: 'doughnut',
+                    data: {{
+                        labels: ['Pass', 'Fail', 'Info', 'Skip', 'Error'],
+                        datasets: [{{
+                            data: [cd.summary.pass, cd.summary.fail, cd.summary.info, cd.summary.skip, cd.summary.error],
+                            backgroundColor: ['#22c55e', '#ef4444', '#3b82f6', '#a3a3a3', '#f59e0b'],
+                            borderColor: '#1e293b', borderWidth: 2,
+                        }}],
+                    }},
+                    options: {{
+                        responsive: true, maintainAspectRatio: true,
+                        plugins: {{ legend: {{ position: 'bottom', labels: {{ color: '#e2e8f0', padding: 10, font: {{ size: 11 }} }} }} }},
+                        cutout: '60%',
+                    }},
+                }});
+
+                // Section bar
+                const sections = cd.by_section.map(s => s.section);
+                new Chart(document.getElementById('dash-section-bar').getContext('2d'), {{
+                    type: 'bar',
+                    data: {{
+                        labels: sections,
+                        datasets: [
+                            {{ label: 'Pass', data: cd.by_section.map(s => s.pass), backgroundColor: '#22c55e' }},
+                            {{ label: 'Fail', data: cd.by_section.map(s => s.fail), backgroundColor: '#ef4444' }},
+                            {{ label: 'Info', data: cd.by_section.map(s => s.info), backgroundColor: '#3b82f6' }},
+                            {{ label: 'Skip', data: cd.by_section.map(s => s.skip), backgroundColor: '#a3a3a3' }},
+                            {{ label: 'Error', data: cd.by_section.map(s => s.error), backgroundColor: '#f59e0b' }},
+                        ],
+                    }},
+                    options: {{
+                        responsive: true, maintainAspectRatio: true,
+                        indexAxis: 'y',
+                        scales: {{
+                            x: {{ stacked: true, ticks: {{ color: '#94a3b8' }}, grid: {{ color: '#334155' }} }},
+                            y: {{ stacked: true, ticks: {{ color: '#e2e8f0', font: {{ size: 11 }} }}, grid: {{ display: false }} }},
+                        }},
+                        plugins: {{ legend: {{ position: 'bottom', labels: {{ color: '#e2e8f0', padding: 10, font: {{ size: 11 }} }} }} }},
+                    }},
+                }});
+            }} catch (e) {{
+                console.log('No chart data available:', e);
+                document.getElementById('dashboard-charts').style.display = 'none';
+            }}
+        }})();
         </script>
     </body>
     </html>

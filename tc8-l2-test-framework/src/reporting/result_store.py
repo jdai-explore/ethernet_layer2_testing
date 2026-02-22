@@ -1,12 +1,6 @@
-"""
-Result store — persists test reports to a database for history and trends.
-
-Provides CRUD operations over TestRunRecord / TestResultRecord
-backed by SQLAlchemy.
-"""
-
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -64,6 +58,31 @@ class ResultStore:
         )
 
         for r in report.results:
+            # Serialize frame captures as JSON lists
+            sent_json = None
+            received_json = None
+            if r.sent_frames:
+                sent_json = json.dumps(
+                    [f.model_dump(exclude={"raw_bytes"}) for f in r.sent_frames],
+                    default=str,
+                )
+            if r.received_frames:
+                # received_frames is dict[int, list[FrameCapture]]
+                recv_data: dict[str, list[dict]] = {}
+                if isinstance(r.received_frames, dict):
+                    for port_id, frames in r.received_frames.items():
+                        recv_data[str(port_id)] = [
+                            f.model_dump(exclude={"raw_bytes"}) if hasattr(f, "model_dump") else f
+                            for f in frames
+                        ]
+                    received_json = json.dumps(recv_data, default=str)
+                elif isinstance(r.received_frames, list):
+                    received_json = json.dumps(
+                        [f.model_dump(exclude={"raw_bytes"}) if hasattr(f, "model_dump") else f
+                         for f in r.received_frames],
+                        default=str,
+                    )
+
             run.results.append(
                 TestResultRecord(
                     case_id=r.case_id,
@@ -74,6 +93,10 @@ class ResultStore:
                     duration_ms=r.duration_ms,
                     message=r.message or None,
                     error_detail=r.error_detail,
+                    expected_json=json.dumps(r.expected, default=str) if r.expected else None,
+                    actual_json=json.dumps(r.actual, default=str) if r.actual else None,
+                    sent_frames_json=sent_json,
+                    received_frames_json=received_json,
                 )
             )
 

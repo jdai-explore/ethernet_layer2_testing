@@ -74,23 +74,32 @@ class ReportGenerator:
 
     def _build_context(self, report: TestSuiteReport) -> dict[str, Any]:
         """Build the template rendering context from a report."""
+        from src.utils.hexdump import hexdump_html, hexdump_css, frame_summary
+
         # Section breakdown
         section_stats: dict[str, dict[str, int]] = {}
+        section_labels = {
+            "5.3": "5.3 VLAN", "5.4": "5.4 General", "5.5": "5.5 Address Learning",
+            "5.6": "5.6 Filtering", "5.7": "5.7 Time Sync", "5.8": "5.8 QoS",
+            "5.9": "5.9 Configuration",
+        }
+
         for result in report.results:
             sec = result.section.value if result.section else "unknown"
-            if sec not in section_stats:
-                section_stats[sec] = {"pass": 0, "fail": 0, "info": 0, "skip": 0, "error": 0}
+            label = section_labels.get(sec, sec)
+            if label not in section_stats:
+                section_stats[label] = {"pass": 0, "fail": 0, "info": 0, "skip": 0, "error": 0}
             match result.status:
                 case TestStatus.PASS:
-                    section_stats[sec]["pass"] += 1
+                    section_stats[label]["pass"] += 1
                 case TestStatus.FAIL:
-                    section_stats[sec]["fail"] += 1
+                    section_stats[label]["fail"] += 1
                 case TestStatus.INFORMATIONAL:
-                    section_stats[sec]["info"] += 1
+                    section_stats[label]["info"] += 1
                 case TestStatus.SKIP:
-                    section_stats[sec]["skip"] += 1
+                    section_stats[label]["skip"] += 1
                 case TestStatus.ERROR:
-                    section_stats[sec]["error"] += 1
+                    section_stats[label]["error"] += 1
 
         # Failures only
         failures = [r for r in report.results if r.status == TestStatus.FAIL]
@@ -99,6 +108,53 @@ class ReportGenerator:
         # Pass rate
         total_non_skip = report.total_cases - report.skipped
         pass_rate = (report.passed / total_non_skip * 100) if total_non_skip > 0 else 0.0
+
+        # Chart data (JSON-serializable for Chart.js)
+        chart_data = {
+            "summary": {
+                "pass": report.passed,
+                "fail": report.failed,
+                "info": report.informational,
+                "skip": report.skipped,
+                "error": report.errors,
+            },
+            "sections": list(section_stats.keys()),
+            "section_pass": [s["pass"] for s in section_stats.values()],
+            "section_fail": [s["fail"] for s in section_stats.values()],
+            "section_info": [s["info"] for s in section_stats.values()],
+            "section_skip": [s["skip"] for s in section_stats.values()],
+            "section_error": [s["error"] for s in section_stats.values()],
+        }
+
+        # Frame hexdumps per result
+        result_details: dict[str, dict[str, Any]] = {}
+        for r in report.results:
+            detail: dict[str, Any] = {
+                "expected": r.expected,
+                "actual": r.actual,
+                "sent_hexdumps": [],
+                "received_hexdumps": [],
+            }
+            for frame in r.sent_frames:
+                if frame.raw_bytes:
+                    detail["sent_hexdumps"].append({
+                        "port": frame.port_id,
+                        "summary": frame_summary(frame.raw_bytes),
+                        "hex_html": hexdump_html(frame.raw_bytes),
+                    })
+                elif frame.raw_hex:
+                    try:
+                        raw = bytes.fromhex(frame.raw_hex)
+                        detail["sent_hexdumps"].append({
+                            "port": frame.port_id,
+                            "summary": frame_summary(raw),
+                            "hex_html": hexdump_html(raw),
+                        })
+                    except ValueError:
+                        pass
+            result_details[r.case_id] = detail
+
+        import json
 
         return {
             "report": report,
@@ -109,6 +165,9 @@ class ReportGenerator:
             "pass_rate": round(pass_rate, 1),
             "tc8_version": "3.0",
             "framework_version": "2.0.0",
+            "chart_data_json": json.dumps(chart_data),
+            "result_details": result_details,
+            "hexdump_css": hexdump_css(),
         }
 
     @staticmethod
