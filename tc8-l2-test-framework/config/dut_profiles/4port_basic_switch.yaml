@@ -1,0 +1,58 @@
+name: 4Port-Basic-Switch
+model: ECU-SW-4P-100
+firmware_version: v1.0.0
+port_count: 4
+ports:
+- port_id: 0
+  interface_name: eth0
+  mac_address: 02:00:00:00:00:00
+  speed_mbps: 100
+  vlan_membership:
+  - 1
+  pvid: 1
+  is_trunk: false
+- port_id: 1
+  interface_name: eth1
+  mac_address: 02:00:00:00:00:01
+  speed_mbps: 100
+  vlan_membership:
+  - 1
+  pvid: 1
+  is_trunk: false
+- port_id: 2
+  interface_name: eth2
+  mac_address: 02:00:00:00:00:02
+  speed_mbps: 100
+  vlan_membership:
+  - 1
+  pvid: 1
+  is_trunk: false
+- port_id: 3
+  interface_name: eth3
+  mac_address: 02:00:00:00:00:03
+  speed_mbps: 100
+  vlan_membership:
+  - 1
+  pvid: 1
+  is_trunk: false
+supported_features:
+- vlan
+- general
+- address_learning
+- filtering
+- time_sync
+- qos
+- configuration
+max_mac_table_size: 512
+mac_aging_time_s: 300
+supports_double_tagging: true
+supports_gptp: true
+can_reset: false
+reset_command: null
+notes: 'Basic 4-port switch with minimal VLAN support.
+
+  All ports in single VLAN (access mode).
+
+  Suitable for simple network topologies.
+
+  '

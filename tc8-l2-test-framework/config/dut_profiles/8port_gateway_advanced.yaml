@@ -1,0 +1,105 @@
+name: 8Port-Gateway-Advanced
+model: ECU-GW-8P-1000
+firmware_version: v2.5.1
+port_count: 8
+ports:
+- port_id: 0
+  interface_name: eth0
+  mac_address: 02:00:00:00:00:00
+  speed_mbps: 1000
+  vlan_membership:
+  - 1
+  - 100
+  - 200
+  - 300
+  - 400
+  pvid: 1
+  is_trunk: true
+- port_id: 1
+  interface_name: eth1
+  mac_address: 02:00:00:00:00:01
+  speed_mbps: 100
+  vlan_membership:
+  - 1
+  pvid: 1
+  is_trunk: false
+- port_id: 2
+  interface_name: eth2
+  mac_address: 02:00:00:00:00:02
+  speed_mbps: 100
+  vlan_membership:
+  - 100
+  pvid: 100
+  is_trunk: false
+- port_id: 3
+  interface_name: eth3
+  mac_address: 02:00:00:00:00:03
+  speed_mbps: 100
+  vlan_membership:
+  - 100
+  pvid: 100
+  is_trunk: false
+- port_id: 4
+  interface_name: eth4
+  mac_address: 02:00:00:00:00:04
+  speed_mbps: 100
+  vlan_membership:
+  - 200
+  pvid: 200
+  is_trunk: false
+- port_id: 5
+  interface_name: eth5
+  mac_address: 02:00:00:00:00:05
+  speed_mbps: 100
+  vlan_membership:
+  - 200
+  pvid: 200
+  is_trunk: false
+- port_id: 6
+  interface_name: eth6
+  mac_address: 02:00:00:00:00:06
+  speed_mbps: 1000
+  vlan_membership:
+  - 300
+  pvid: 300
+  is_trunk: false
+- port_id: 7
+  interface_name: eth7
+  mac_address: 02:00:00:00:00:07
+  speed_mbps: 1000
+  vlan_membership:
+  - 300
+  pvid: 300
+  is_trunk: false
+supported_features:
+- vlan
+- address_learning
+- filtering
+- time_sync
+- qos
+- configuration
+max_mac_table_size: 2048
+mac_aging_time_s: 300
+supports_double_tagging: true
+supports_gptp: true
+can_reset: false
+reset_command: null
+notes: 'Advanced 8-port gateway ECU with full TC8 feature support.
+
+
+  Network topology:
+
+  - Port 0: Backbone trunk (1 Gbps) - connects to central switch
+
+  - Port 1: Diagnostic/OBD (100 Mbps) - VLAN 1
+
+  - Ports 2-3: Sensor domain (100 Mbps) - VLAN 100
+
+  - Ports 4-5: Actuator domain (100 Mbps) - VLAN 200
+
+  - Ports 6-7: Infotainment domain (1 Gbps) - VLAN 300
+
+
+  Supports QoS priority mapping and gPTP time synchronization.
+
+  '
