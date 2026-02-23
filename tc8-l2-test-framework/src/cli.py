@@ -20,7 +20,7 @@ import click
 
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
-from src.core.session_manager import SessionManager
+from src.core.session_manager import create_session_manager
 from src.core.test_runner import TestRunner
 from src.models.test_case import TestSection, TestStatus, TestTier
 from src.reporting.report_generator import ReportGenerator
@@ -84,7 +84,7 @@ def run(dut: str, tier: str, sections: str | None, output: str | None, db_url: s
         click.echo(f"   [{current:4d}/{total}] {sym} {case_id}")
 
     # Build runner
-    session_mgr = SessionManager(config.dut_profile)
+    session_mgr = create_session_manager(config.dut_profile)
     validator = ResultValidator()
     runner = TestRunner(config, session_mgr, validator, progress_callback=progress)
 

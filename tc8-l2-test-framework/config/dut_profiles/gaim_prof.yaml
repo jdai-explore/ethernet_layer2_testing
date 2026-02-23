@@ -1,0 +1,35 @@
+name: Gaim_prof
+model: ''
+firmware_version: unknown
+port_count: 2
+ports:
+- port_id: 0
+  interface_name: Ethernet 2
+  mac_address: 00:E0:4C:68:00:25
+  speed_mbps: 100
+  vlan_membership:
+  - 1
+  pvid: 1
+  is_trunk: true
+- port_id: 1
+  interface_name: eth1
+  mac_address: 02:00:00:00:00:02
+  speed_mbps: 100
+  vlan_membership:
+  - 1
+  pvid: 1
+  is_trunk: false
+supported_features:
+- vlan
+- general
+- address_learning
+- time_sync
+- qos
+- configuration
+max_mac_table_size: 1024
+mac_aging_time_s: 300
+supports_double_tagging: false
+supports_gptp: false
+can_reset: false
+reset_command: null
+notes: ''

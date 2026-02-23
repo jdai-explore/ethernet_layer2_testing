@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
-from src.core.session_manager import SessionManager, NullDUTController
+from src.core.session_manager import SessionManager, NullDUTController, create_session_manager
 from src.core.test_runner import TestRunner
 from src.models.test_case import (
     DUTProfile,
@@ -229,7 +229,7 @@ async def run_suite(request: RunSuiteRequest) -> RunSuiteResponse:
         sections = [SECTION_MAP[s] for s in request.sections if s in SECTION_MAP]
 
     # Setup runner
-    session_mgr = SessionManager(dut_profile)
+    session_mgr = create_session_manager(dut_profile)
     validator = ResultValidator()
 
     async def ws_progress(current: int, total: int, case_id: str, status: TestStatus | None) -> None:

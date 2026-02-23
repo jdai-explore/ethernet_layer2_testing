@@ -19,7 +19,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
-from src.core.session_manager import SessionManager
+from src.core.session_manager import create_session_manager
 from src.core.test_runner import TestRunner
 from src.models.test_case import TestSection, TestStatus, TestTier
 
@@ -78,7 +78,7 @@ def run(ctx: click.Context, dut: str, tier: str, section: tuple[str, ...]) -> No
 
     # Setup and run
     test_tier = TestTier(tier)
-    session_mgr = SessionManager(dut_profile)
+    session_mgr = create_session_manager(dut_profile)
     validator = ResultValidator()
 
     def progress_cb(current: int, total: int, case_id: str, status: TestStatus | None) -> None:

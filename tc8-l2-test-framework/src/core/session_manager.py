@@ -193,3 +193,47 @@ class SessionManager:
     def test_session(self) -> _SessionContext:
         """Create an async context manager for a test session."""
         return self._SessionContext(self)
+
+
+def create_session_manager(
+    dut_profile: DUTProfile,
+    cleanup_wait_s: float = 5.0,
+    aging_wait_s: float = 30.0,
+) -> SessionManager:
+    """
+    Factory that auto-selects the appropriate DUT controller.
+
+    If at least one DUT port's ``interface_name`` maps to a live OS
+    network interface, the ``ScapyDUTController`` is used for real
+    link-state verification.  Otherwise the ``NullDUTController``
+    stub is used (simulation mode).
+    """
+    try:
+        import psutil
+        os_ifaces = set(psutil.net_if_stats().keys())
+    except Exception:
+        os_ifaces = set()
+
+    dut_ifaces = {p.interface_name for p in dut_profile.ports}
+    matched = dut_ifaces & os_ifaces
+
+    if matched:
+        from src.interface.scapy_dut_controller import ScapyDUTController
+
+        logger.info(
+            "Live interfaces detected (%s) — using ScapyDUTController",
+            ", ".join(sorted(matched)),
+        )
+        controller: DUTController | NullDUTController = ScapyDUTController(dut_profile)
+    else:
+        logger.info(
+            "No live interfaces matched DUT ports — using NullDUTController (simulation)",
+        )
+        controller = NullDUTController()
+
+    return SessionManager(
+        dut_profile=dut_profile,
+        controller=controller,
+        cleanup_wait_s=cleanup_wait_s,
+        aging_wait_s=aging_wait_s,
+    )
