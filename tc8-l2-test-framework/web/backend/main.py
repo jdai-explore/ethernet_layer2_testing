@@ -31,7 +31,8 @@ from pydantic import BaseModel, Field
 
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
-from src.core.session_manager import SessionManager, NullDUTController, create_session_manager
+from src.core.session_manager import SessionManager, NullDUTController, create_session_manager, create_test_components
+from src.interface.scapy_interface import ScapyInterface
 from src.core.test_runner import TestRunner
 from src.models.test_case import (
     DUTProfile,
@@ -229,7 +230,7 @@ async def run_suite(request: RunSuiteRequest) -> RunSuiteResponse:
         sections = [SECTION_MAP[s] for s in request.sections if s in SECTION_MAP]
 
     # Setup runner
-    session_mgr = create_session_manager(dut_profile)
+    session_mgr, interface = create_test_components(dut_profile)
     validator = ResultValidator()
 
     async def ws_progress(current: int, total: int, case_id: str, status: TestStatus | None) -> None:
@@ -246,7 +247,7 @@ async def run_suite(request: RunSuiteRequest) -> RunSuiteResponse:
             except Exception:
                 pass
 
-    active_runner = TestRunner(config, session_mgr, validator)
+    active_runner = TestRunner(config, session_mgr, validator, interface=interface)
     tier = TestTier(request.tier)
     report = await active_runner.run_suite(tier, sections, request.spec_ids)
     active_runner = None
@@ -468,11 +469,9 @@ async def run_preflight() -> dict[str, Any]:
     except Exception as e:
         checks.append({"name": "Database", "status": "fail", "detail": str(e)})
 
-    # 5. Session Manager
     try:
-        sm = SessionManager(
+        sm = create_session_manager(
             dut_profile=test_profile,
-            controller=NullDUTController(),
             cleanup_wait_s=0.0,
             aging_wait_s=0.0,
         )
@@ -1181,7 +1180,7 @@ async def index() -> str:
                             </div>
                             <div class="form-group">
                                 <label>Port Count</label>
-                                <input type="number" id="dut-ports" value="4" min="2" max="16" onchange="rebuildPortTable()">
+                                <input type="number" id="dut-ports" value="4" min="1" max="16" onchange="rebuildPortTable()">
                             </div>
                             <div class="form-group">
                                 <label>MAC Table Size</label>

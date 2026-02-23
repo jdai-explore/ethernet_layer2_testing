@@ -258,30 +258,46 @@ class TestRunner:
 
         # Execute test cases
         t0 = time.perf_counter()
-        for idx, case in enumerate(all_cases):
+        # Execute test cases grouped by specification to reuse sessions
+        t0 = time.perf_counter()
+        executed_count = 0
+
+        # Maintain original order but group contiguous specs
+        from itertools import groupby
+        for spec_id, spec_cases in groupby(all_cases, key=lambda x: x.spec_id):
+            spec_cases_list = list(spec_cases)
+            
+            # Start a single session for the entire group of cases for this spec
+            async with self.session.test_session() as session:
+                for case in spec_cases_list:
+                    if self._cancel_requested:
+                        break
+
+                    # Execute case within the shared session
+                    result = await self._execute_case(case, session=session)
+                    report.results.append(result)
+
+                    # Update counters
+                    match result.status:
+                        case TestStatus.PASS:
+                            report.passed += 1
+                        case TestStatus.FAIL:
+                            report.failed += 1
+                        case TestStatus.INFORMATIONAL:
+                            report.informational += 1
+                        case TestStatus.SKIP:
+                            report.skipped += 1
+                        case TestStatus.ERROR:
+                            report.errors += 1
+
+                    # Progress callback
+                    executed_count += 1
+                    if self.progress_callback:
+                        self.progress_callback(executed_count, len(all_cases), case.case_id, result.status)
+
             if self._cancel_requested:
-                logger.info("Test run cancelled at case %d/%d", idx + 1, len(all_cases))
+                logger.info("Test run cancelled at case %d/%d", executed_count, len(all_cases))
                 break
-
-            result = await self._execute_case(case)
-            report.results.append(result)
-
-            # Update counters
-            match result.status:
-                case TestStatus.PASS:
-                    report.passed += 1
-                case TestStatus.FAIL:
-                    report.failed += 1
-                case TestStatus.INFORMATIONAL:
-                    report.informational += 1
-                case TestStatus.SKIP:
-                    report.skipped += 1
-                case TestStatus.ERROR:
-                    report.errors += 1
-
-            # Progress callback
-            if self.progress_callback:
-                self.progress_callback(idx + 1, len(all_cases), case.case_id, result.status)
 
         report.duration_s = time.perf_counter() - t0
         self._running = False
@@ -293,72 +309,99 @@ class TestRunner:
         )
         return report
 
-    async def _execute_case(self, case: TestCase) -> TestResult:
-        """Execute a single test case within a managed session."""
+    async def _execute_case(self, case: TestCase, session: Any = None) -> TestResult:
+        """
+        Execute a single test case.
+        
+        If a session is provided, it is used directly. Otherwise, a new
+        managed session is created for this case.
+        """
 
         with TestLogCapture() as capture:
             logger.debug("Executing: %s", case.case_id)
             try:
-                async with self.session.test_session() as session:
-                    if not session.is_clean:
-                        result = TestResult(
-                            case_id=case.case_id,
-                            spec_id=case.spec_id,
-                            tc8_reference=case.tc8_reference,
-                            section=case.section,
-                            status=TestStatus.ERROR,
-                            message="Session setup failed — DUT not in clean state",
-                        )
-                        result.log_entries = capture.entries
-                        return result
-
-                    # Try spec registry first (section-specific logic)
-                    if self._spec_registry is not None and self._spec_registry.has_handler(case.section):
-                        spec = self.config.spec_definitions.get(case.spec_id)
-                        if spec is not None:
-                            handler = self._spec_registry.get_handler(case.section)
-                            result = await handler.execute_spec(spec, case, self.interface)
-                            result.log_entries = capture.entries
-                            return result
-
-                    # Fallback: generic send/capture flow
-                    t0 = time.perf_counter()
-
-                    # Build and send frame
-                    sent_frames = await self._send_test_frame(case)
-
-                    # Capture responses on all ports
-                    received_frames = await self._capture_responses(case)
-
-                    duration_ms = (time.perf_counter() - t0) * 1000
-
-                    # Build expected outcome from spec
-                    spec = self.config.spec_definitions.get(case.spec_id)
-                    expected = spec.expected_result if spec else {}
-
-                    # Add dynamic port expectations
-                    expected = self._build_dynamic_expected(case, expected)
-
-                    # Validate
-                    result = self.validator.validate(
-                        case, sent_frames, received_frames, expected, duration_ms
-                    )
-                    result.log_entries = capture.entries
-                    return result
-
+                if session is not None:
+                    # Use existing session
+                    result = await self._run_logic_with_session(case, session, capture)
+                else:
+                    # Create temporary session
+                    async with self.session.test_session() as new_session:
+                        result = await self._run_logic_with_session(case, new_session, capture)
+                
+                return result
             except Exception as exc:
-                logger.exception("Error executing %s: %s", case.case_id, exc)
-                result = TestResult(
+                logger.error("Error executing case %s: %s", case.case_id, exc, exc_info=True)
+                return TestResult(
                     case_id=case.case_id,
                     spec_id=case.spec_id,
                     tc8_reference=case.tc8_reference,
                     section=case.section,
                     status=TestStatus.ERROR,
-                    message=f"Framework error: {exc}",
-                    error_detail=str(exc),
+                    message=f"Execution error: {exc}",
                 )
-                result.log_entries = capture.entries
-                return result
+
+    async def _run_logic_with_session(self, case: TestCase, session: Any, capture: Any) -> TestResult:
+        """Internal helper to run the spec logic with an active session."""
+        if not session.is_clean:
+            result = TestResult(
+                case_id=case.case_id,
+                spec_id=case.spec_id,
+                tc8_reference=case.tc8_reference,
+                section=case.section,
+                status=TestStatus.ERROR,
+                message="Session setup failed — DUT not in clean state",
+            )
+            result.log_entries = capture.entries
+            return result
+
+        try:
+            # Try spec registry first (section-specific logic)
+            if self._spec_registry is not None and self._spec_registry.has_handler(case.section):
+                spec = self.config.spec_definitions.get(case.spec_id)
+                if spec is not None:
+                    handler = self._spec_registry.get_handler(case.section)
+                    result = await handler.execute_spec(spec, case, self.interface)
+                    result.log_entries = capture.entries
+                    return result
+
+            # Fallback: generic send/capture flow
+            t0 = time.perf_counter()
+
+            # Build and send frame
+            sent_frames = await self._send_test_frame(case)
+
+            # Capture responses on all ports
+            received_frames = await self._capture_responses(case)
+
+            duration_ms = (time.perf_counter() - t0) * 1000
+
+            # Build expected outcome from spec
+            spec = self.config.spec_definitions.get(case.spec_id)
+            expected = spec.expected_result if spec else {}
+
+            # Add dynamic port expectations
+            expected = self._build_dynamic_expected(case, expected)
+
+            # Validate
+            result = self.validator.validate(
+                case, sent_frames, received_frames, expected, duration_ms
+            )
+            result.log_entries = capture.entries
+            return result
+
+        except Exception as exc:
+            logger.exception("Error executing %s: %s", case.case_id, exc)
+            result = TestResult(
+                case_id=case.case_id,
+                spec_id=case.spec_id,
+                tc8_reference=case.tc8_reference,
+                section=case.section,
+                status=TestStatus.ERROR,
+                message=f"Framework error: {exc}",
+                error_detail=str(exc),
+            )
+            result.log_entries = capture.entries
+            return result
 
 
     async def _send_test_frame(self, case: TestCase) -> list[FrameCapture]:

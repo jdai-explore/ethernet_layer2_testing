@@ -197,16 +197,25 @@ class SessionManager:
 
 def create_session_manager(
     dut_profile: DUTProfile,
-    cleanup_wait_s: float = 5.0,
+    cleanup_wait_s: float = 1.0,
     aging_wait_s: float = 30.0,
 ) -> SessionManager:
-    """
-    Factory that auto-selects the appropriate DUT controller.
+    """Legacy factory for SessionManager only."""
+    sm, _ = create_test_components(dut_profile, cleanup_wait_s, aging_wait_s)
+    return sm
 
-    If at least one DUT port's ``interface_name`` maps to a live OS
-    network interface, the ``ScapyDUTController`` is used for real
-    link-state verification.  Otherwise the ``NullDUTController``
-    stub is used (simulation mode).
+
+def create_test_components(
+    dut_profile: DUTProfile,
+    cleanup_wait_s: float = 1.0,
+    aging_wait_s: float = 30.0,
+) -> tuple[SessionManager, Any | None]:
+    """
+    Factory that auto-selects and instantiates test components.
+
+    Returns:
+        (SessionManager, ScapyInterface or None)
+        Interface is None if no live hardware is detected (Simulation Mode).
     """
     try:
         import psutil
@@ -217,23 +226,30 @@ def create_session_manager(
     dut_ifaces = {p.interface_name for p in dut_profile.ports}
     matched = dut_ifaces & os_ifaces
 
+    controller: DUTController | NullDUTController
+    interface: Any | None = None
+
     if matched:
         from src.interface.scapy_dut_controller import ScapyDUTController
+        from src.interface.scapy_interface import ScapyInterface
 
         logger.info(
-            "Live interfaces detected (%s) — using ScapyDUTController",
+            "Live interfaces detected (%s) — using hardware controllers",
             ", ".join(sorted(matched)),
         )
-        controller: DUTController | NullDUTController = ScapyDUTController(dut_profile)
+        controller = ScapyDUTController(dut_profile)
+        interface = ScapyInterface(dut_profile.ports)
     else:
         logger.info(
-            "No live interfaces matched DUT ports — using NullDUTController (simulation)",
+            "No live interfaces matched DUT ports — using Simulation Mode",
         )
         controller = NullDUTController()
+        interface = None
 
-    return SessionManager(
+    sm = SessionManager(
         dut_profile=dut_profile,
         controller=controller,
         cleanup_wait_s=cleanup_wait_s,
         aging_wait_s=aging_wait_s,
     )
+    return sm, interface

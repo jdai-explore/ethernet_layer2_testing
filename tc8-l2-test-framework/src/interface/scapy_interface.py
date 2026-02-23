@@ -85,6 +85,10 @@ class ScapyInterface(BaseDUTInterface):
 
         self._initialized = True
         logger.info("ScapyInterface initialized with %d ports", len(self.ports))
+        
+        import platform
+        if platform.system() == "Windows":
+            logger.info("Running on Windows — Note: VLAN tags may be stripped by NIC drivers unless Npcap 'Dot1Q' support is enabled.")
 
     async def shutdown(self) -> None:
         """Stop all sniffers and clean up."""

@@ -19,7 +19,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from src.core.config_manager import ConfigManager
 from src.core.result_validator import ResultValidator
-from src.core.session_manager import create_session_manager
+from src.core.session_manager import create_session_manager, create_test_components
 from src.core.test_runner import TestRunner
 from src.models.test_case import TestSection, TestStatus, TestTier
 
@@ -78,7 +78,7 @@ def run(ctx: click.Context, dut: str, tier: str, section: tuple[str, ...]) -> No
 
     # Setup and run
     test_tier = TestTier(tier)
-    session_mgr = create_session_manager(dut_profile)
+    session_mgr, interface = create_test_components(dut_profile)
     validator = ResultValidator()
 
     def progress_cb(current: int, total: int, case_id: str, status: TestStatus | None) -> None:
@@ -86,7 +86,7 @@ def run(ctx: click.Context, dut: str, tier: str, section: tuple[str, ...]) -> No
         s = icon.get(status.value, "❓") if status else "🔄"
         console.print(f"  [{current}/{total}] {s} {case_id}")
 
-    runner = TestRunner(config, session_mgr, validator, progress_callback=progress_cb)
+    runner = TestRunner(config, session_mgr, validator, interface=interface, progress_callback=progress_cb)
 
     console.print(f"\n[bold]Running [yellow]{tier}[/yellow] suite...[/bold]\n")
     report = asyncio.run(runner.run_suite(test_tier, sections))

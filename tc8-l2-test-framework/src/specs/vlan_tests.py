@@ -95,6 +95,9 @@ class VLANTests(BaseTestSpec):
 
         # Determine expected ports: members of the VID
         dut = self.config.dut_profile
+        if dut and dut.port_count == 1:
+            logger.warning("[%s] Running in 1-port mode. Forwarding cannot be fully verified as there are no egress ports.", spec.spec_id)
+
         member_ports = self._get_member_ports(params.vid, params.ingress_port, dut)
         non_member_ports = self._get_non_member_ports(params.vid, params.ingress_port, dut)
 

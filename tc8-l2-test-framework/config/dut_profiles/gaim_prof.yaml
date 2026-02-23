@@ -1,7 +1,7 @@
 name: Gaim_prof
 model: ''
 firmware_version: unknown
-port_count: 2
+port_count: 1
 ports:
 - port_id: 0
   interface_name: Ethernet 2
@@ -11,14 +11,6 @@ ports:
   - 1
   pvid: 1
   is_trunk: true
-- port_id: 1
-  interface_name: eth1
-  mac_address: 02:00:00:00:00:02
-  speed_mbps: 100
-  vlan_membership:
-  - 1
-  pvid: 1
-  is_trunk: false
 supported_features:
 - vlan
 - general

@@ -116,7 +116,7 @@ class DUTProfile(BaseModel):
     name: str = Field(description="Human-readable DUT identifier")
     model: str = Field(default="", description="ECU model/part number")
     firmware_version: str = Field(default="unknown")
-    port_count: int = Field(ge=2, le=16, description="Number of Ethernet ports on DUT")
+    port_count: int = Field(ge=1, le=16, description="Number of Ethernet ports on DUT")
     ports: list[PortConfig] = Field(default_factory=list)
     supported_features: list[str] = Field(
         default_factory=lambda: [
