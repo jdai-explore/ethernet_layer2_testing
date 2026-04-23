@@ -93,6 +93,7 @@ class ResultValidator:
             self._check_vlan_tags(test_case, received_frames, expected, result),
             self._check_no_leakage(test_case, received_frames, expected, result),
             self._check_frame_count(test_case, received_frames, expected, result),
+            self._check_drop_action(test_case, received_frames, expected, result),
         ]
 
         # Overall status: FAIL if any check fails
@@ -173,9 +174,8 @@ class ResultValidator:
                         return TestStatus.FAIL
 
                 elif expected_tag_action == "drop":
-                    if frames:
-                        result.message += f"FAIL: Frame should have been dropped on port {port_id}. "
-                        return TestStatus.FAIL
+                    # Drop-action validation is handled by _check_drop_action
+                    pass
 
         return TestStatus.PASS
 
@@ -223,6 +223,30 @@ class ResultValidator:
                 result.message += (
                     f"FAIL: Frame count mismatch on port {port_id}: "
                     f"expected={expected_count}, actual={actual_count}. "
+                )
+                return TestStatus.FAIL
+
+        return TestStatus.PASS
+
+    def _check_drop_action(
+        self,
+        test_case: TestCase,
+        received_frames: dict[int, list[FrameCapture]],
+        expected: dict[str, Any],
+        result: TestResult,
+    ) -> TestStatus:
+        """Verify frame was dropped (nothing received on any egress port)."""
+        if expected.get("tag_action") != "drop":
+            return TestStatus.PASS
+
+        ingress_port = test_case.parameters.ingress_port
+        for port_id, frames in received_frames.items():
+            if port_id == ingress_port:
+                continue
+            if len(frames) > 0:
+                result.message += (
+                    f"FAIL: Frame should have been dropped but "
+                    f"{len(frames)} frame(s) received on port {port_id}. "
                 )
                 return TestStatus.FAIL
 

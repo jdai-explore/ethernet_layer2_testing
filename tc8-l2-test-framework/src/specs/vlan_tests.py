@@ -49,27 +49,27 @@ class VLANTests(BaseTestSpec):
     ) -> TestResult:
         """Route to VLAN-specific handler."""
         handlers = {
-            "SWITCH_VLAN_001": self._test_vlan_membership,
-            "SWITCH_VLAN_002": self._test_vlan_membership_tagged,
-            "SWITCH_VLAN_003": self._test_vlan_non_member_drop,
-            "SWITCH_VLAN_004": self._test_vlan_tag_insertion,
-            "SWITCH_VLAN_005": self._test_vlan_tag_removal,
-            "SWITCH_VLAN_006": self._test_pvid_assignment,
-            "SWITCH_VLAN_007": self._test_pvid_untagged_ingress,
-            "SWITCH_VLAN_008": self._test_priority_tagged,
-            "SWITCH_VLAN_009": self._test_reserved_vid_0,
-            "SWITCH_VLAN_010": self._test_double_tagged_forwarding,
-            "SWITCH_VLAN_011": self._test_vlan_membership_all_ports,
-            "SWITCH_VLAN_012": self._test_vlan_isolation,
-            "SWITCH_VLAN_013": self._test_trunk_to_access,
-            "SWITCH_VLAN_014": self._test_access_to_trunk,
-            "SWITCH_VLAN_015": self._test_pvid_mismatch,
-            "SWITCH_VLAN_016": self._test_double_tagged_s_vlan,
-            "SWITCH_VLAN_017": self._test_double_tagged_c_vlan_preservation,
-            "SWITCH_VLAN_018": self._test_double_tagged_strip,
-            "SWITCH_VLAN_019": self._test_vlan_filtering_ingress,
-            "SWITCH_VLAN_020": self._test_vlan_filtering_egress,
-            "SWITCH_VLAN_021": self._test_reserved_vid_4095,
+            "SWITCH_VLAN_001": self._test_vlan_membership_tagged,      # 5.3.1  Tagged forwarding
+            "SWITCH_VLAN_002": self._test_vlan_membership,              # 5.3.2  Untagged handling
+            "SWITCH_VLAN_003": self._test_vlan_tag_insertion,           # 5.3.3  Tag insertion
+            "SWITCH_VLAN_004": self._test_vlan_tag_removal,             # 5.3.4  Tag removal
+            "SWITCH_VLAN_005": self._test_vlan_tag_preservation,        # 5.3.5  Tag preservation
+            "SWITCH_VLAN_006": self._test_pvid_assignment,              # 5.3.6  PVID assignment
+            "SWITCH_VLAN_007": self._test_vlan_non_member_drop,         # 5.3.7  Non-member drop
+            "SWITCH_VLAN_008": self._test_priority_tagged,              # 5.3.8  Priority tagged
+            "SWITCH_VLAN_009": self._test_reserved_vid_4095,            # 5.3.9  Reserved VID 4095
+            "SWITCH_VLAN_010": self._test_double_tagged_forwarding,     # 5.3.10 Double-tagged
+            "SWITCH_VLAN_011": self._test_vlan_membership_all_ports,    # 5.3.11
+            "SWITCH_VLAN_012": self._test_vlan_isolation,               # 5.3.12
+            "SWITCH_VLAN_013": self._test_trunk_to_access,              # 5.3.13
+            "SWITCH_VLAN_014": self._test_access_to_trunk,              # 5.3.14
+            "SWITCH_VLAN_015": self._test_pvid_mismatch,               # 5.3.15
+            "SWITCH_VLAN_016": self._test_double_tagged_s_vlan,         # 5.3.16
+            "SWITCH_VLAN_017": self._test_double_tagged_c_vlan_preservation,  # 5.3.17
+            "SWITCH_VLAN_018": self._test_double_tagged_strip,          # 5.3.18
+            "SWITCH_VLAN_019": self._test_vlan_filtering_ingress,       # 5.3.19
+            "SWITCH_VLAN_020": self._test_vlan_filtering_egress,        # 5.3.20
+            "SWITCH_VLAN_021": self._test_reserved_vid_4095,            # 5.3.21
         }
 
         handler = handlers.get(spec.spec_id, self._test_generic_vlan)
@@ -199,7 +199,33 @@ class VLANTests(BaseTestSpec):
         }
         return self.validator.validate(case, sent, received, expected, duration_ms)
 
-    # ── PVID (006-009) ────────────────────────────────────────────────
+    async def _test_vlan_tag_preservation(
+        self, spec: TestSpecDefinition, case: TestCase, interface: Any
+    ) -> TestResult:
+        """SWITCH_VLAN_005 — Tag preservation on trunk-to-trunk forwarding."""
+        self.log_spec_info(spec)
+        params = case.parameters
+        t0 = time.perf_counter()
+
+        case.parameters.frame_type = FrameType.SINGLE_TAGGED
+        sent, received = await self._send_and_capture(case, interface)
+        duration_ms = (time.perf_counter() - t0) * 1000
+
+        dut = self.config.dut_profile
+        trunk_ports = [p.port_id for p in (dut.ports if dut else [])
+                       if p.is_trunk and p.port_id != params.ingress_port
+                       and params.vid in p.vlan_membership]
+
+        expected = {
+            "forward_to_ports": trunk_ports,
+            "tag_action": "tagged",
+            "expected_vid": params.vid,
+            "preserve_pcp": True,
+            **spec.expected_result,
+        }
+        return self.validator.validate(case, sent, received, expected, duration_ms)
+
+    # ── PVID (006-008) ────────────────────────────────────────────────
 
     async def _test_pvid_assignment(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -207,18 +233,6 @@ class VLANTests(BaseTestSpec):
         """SWITCH_VLAN_006 — PVID assignment validation."""
         self.log_spec_info(spec)
         t0 = time.perf_counter()
-        sent, received = await self._send_and_capture(case, interface)
-        duration_ms = (time.perf_counter() - t0) * 1000
-        expected = {**spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
-
-    async def _test_pvid_untagged_ingress(
-        self, spec: TestSpecDefinition, case: TestCase, interface: Any
-    ) -> TestResult:
-        """SWITCH_VLAN_007 — Untagged frame classified to PVID."""
-        self.log_spec_info(spec)
-        t0 = time.perf_counter()
-        case.parameters.frame_type = FrameType.UNTAGGED
         sent, received = await self._send_and_capture(case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {**spec.expected_result}
@@ -232,18 +246,6 @@ class VLANTests(BaseTestSpec):
         t0 = time.perf_counter()
         case.parameters.vid = 0
         case.parameters.frame_type = FrameType.SINGLE_TAGGED
-        sent, received = await self._send_and_capture(case, interface)
-        duration_ms = (time.perf_counter() - t0) * 1000
-        expected = {**spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
-
-    async def _test_reserved_vid_0(
-        self, spec: TestSpecDefinition, case: TestCase, interface: Any
-    ) -> TestResult:
-        """SWITCH_VLAN_009 — Reserved VID 0 handling."""
-        self.log_spec_info(spec)
-        t0 = time.perf_counter()
-        case.parameters.vid = 0
         sent, received = await self._send_and_capture(case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {**spec.expected_result}
@@ -364,12 +366,10 @@ class VLANTests(BaseTestSpec):
     async def _send_and_capture(
         self, case: TestCase, interface: Any
     ) -> tuple[list[FrameCapture], dict[int, list[FrameCapture]]]:
-        """Send test frame and capture responses."""
+        """Send test frame and capture responses (atomic on real HW)."""
         params = case.parameters
         if interface is not None:
-            sent = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
-            return sent, received
+            return await interface.send_and_capture(case)
 
         # Simulation mode
         sent = [FrameCapture(

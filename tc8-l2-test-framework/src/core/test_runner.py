@@ -367,11 +367,12 @@ class TestRunner:
             # Fallback: generic send/capture flow
             t0 = time.perf_counter()
 
-            # Build and send frame
-            sent_frames = await self._send_test_frame(case)
-
-            # Capture responses on all ports
-            received_frames = await self._capture_responses(case)
+            # Build and send frame; capture responses atomically when HW available
+            if self.interface is not None:
+                sent_frames, received_frames = await self.interface.send_and_capture(case)
+            else:
+                sent_frames = await self._send_test_frame(case)
+                received_frames = await self._capture_responses(case)
 
             duration_ms = (time.perf_counter() - t0) * 1000
 

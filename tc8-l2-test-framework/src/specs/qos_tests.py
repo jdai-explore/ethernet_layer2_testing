@@ -67,6 +67,7 @@ class QoSTests(BaseTestSpec):
         t0 = time.perf_counter()
 
         case.parameters.frame_type = FrameType.SINGLE_TAGGED
+        case.parameters.pcp = case.parameters.custom.get("pcp", 0)
         sent, received = await self._send_and_capture(case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
@@ -138,7 +139,7 @@ class QoSTests(BaseTestSpec):
     ) -> tuple[list[FrameCapture], dict[int, list[FrameCapture]]]:
         params = case.parameters
         if interface is not None:
-            return await interface.send_frame(case), await interface.capture_frames(case)
+            return await interface.send_and_capture(case)
 
         sent = [FrameCapture(
             port_id=params.ingress_port, timestamp=time.time(),

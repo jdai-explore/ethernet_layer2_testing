@@ -185,6 +185,7 @@ class TestCaseParameters(BaseModel):
     vid: int = Field(default=1, ge=0, le=4095)
     frame_type: FrameType = Field(default=FrameType.UNTAGGED)
     tpid: int = Field(default=0x8100)
+    pcp: int = Field(default=0, ge=0, le=7, description="Priority Code Point (0-7)")
     protocol: ProtocolType = Field(default=ProtocolType.ICMP)
     src_mac: str = Field(default="02:00:00:00:00:01")
     dst_mac: str = Field(default="02:00:00:00:00:02")

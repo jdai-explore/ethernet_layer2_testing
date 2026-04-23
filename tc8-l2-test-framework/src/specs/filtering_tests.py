@@ -193,9 +193,7 @@ class FilteringTests(BaseTestSpec):
     ) -> tuple[list[FrameCapture], dict[int, list[FrameCapture]]]:
         params = case.parameters
         if interface is not None:
-            sent = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
-            return sent, received
+            return await interface.send_and_capture(case)
 
         sent = [FrameCapture(
             port_id=params.ingress_port, timestamp=time.time(),

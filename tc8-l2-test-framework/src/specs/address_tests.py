@@ -335,12 +335,10 @@ class AddressTests(BaseTestSpec):
     async def _send_and_capture(
         self, case: TestCase, interface: Any
     ) -> tuple[list[FrameCapture], dict[int, list[FrameCapture]]]:
-        """Send test frame and capture responses."""
+        """Send test frame and capture responses (atomic on real HW)."""
         params = case.parameters
         if interface is not None:
-            sent = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
-            return sent, received
+            return await interface.send_and_capture(case)
 
         # Simulation mode
         sent = [FrameCapture(

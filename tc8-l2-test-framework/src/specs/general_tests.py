@@ -84,15 +84,23 @@ class GeneralTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        # Step 1: Send learning frame from destination port first
         sent_frames: list[FrameCapture] = []
         received: dict[int, list[FrameCapture]] = {}
 
         if interface is not None:
-            # Pre-learn: send a frame FROM the target MAC on the egress port
-            # Then send the actual test frame
-            sent_frames = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
+            # Step 1: Pre-learn destination MAC on the egress port.
+            # Send a frame FROM dst_mac on the expected egress port
+            # so the DUT associates dst_mac with that port.
+            if params.egress_ports:
+                learning_case = case.model_copy(deep=True)
+                learning_case.parameters.src_mac = params.dst_mac
+                learning_case.parameters.dst_mac = params.src_mac
+                learning_case.parameters.ingress_port = params.egress_ports[0]
+                await interface.send_frame(learning_case)
+                await asyncio.sleep(0.5)  # Allow DUT to process learning
+
+            # Step 2: Send actual test frame and capture
+            sent_frames, received = await interface.send_and_capture(case)
         else:
             # Simulation mode — create synthetic frames
             sent_frames = [FrameCapture(

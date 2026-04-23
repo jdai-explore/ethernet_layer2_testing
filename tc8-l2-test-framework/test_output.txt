@@ -1,0 +1,202 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.11.0, pytest-8.4.1, pluggy-1.6.0
+PySide6 6.9.1 -- Qt runtime 6.9.1 -- Qt compiled 6.9.1
+rootdir: Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.6.3, asyncio-1.3.0, cov-7.0.0, qt-4.5.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 47 items
+
+tests\integration\test_smoke_suite.py .......FFF                         [ 21%]
+tests\self_validation\test_self_validation.py ..........                 [ 42%]
+tests\test_hexdump.py ....................                               [ 85%]
+tests\unit\test_spec_definitions.py .......                              [100%]
+
+================================== FAILURES ===================================
+_________________ TestSmokeRun.test_smoke_run_produces_report _________________
+
+self = <tests.integration.test_smoke_suite.TestSmokeRun object at 0x0000024C4929A910>
+runner = <src.core.test_runner.TestRunner object at 0x0000024C4D650710>
+
+    @pytest.mark.asyncio
+    async def test_smoke_run_produces_report(
+        self,
+        runner: TestRunner,
+    ) -> None:
+        """Smoke run should produce a valid report with results."""
+>       report = await runner.run_suite(tier=TestTier.SMOKE)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\integration\test_smoke_suite.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.core.test_runner.TestRunner object at 0x0000024C4D650710>
+tier = <TestTier.SMOKE: 'smoke'>, sections = None, spec_ids = None
+
+    async def run_suite(
+        self,
+        tier: TestTier = TestTier.SMOKE,
+        sections: list[TestSection] | None = None,
+        spec_ids: list[str] | None = None,
+    ) -> TestSuiteReport:
+        """
+        Execute a full test suite.
+    
+        Args:
+            tier: Execution tier (smoke/core/full).
+            sections: Optional filter ù only run specs from these sections.
+            spec_ids: Optional filter ù only run these specific spec IDs.
+    
+        Returns:
+            TestSuiteReport with all results.
+        """
+        self._running = True
+        self._cancel_requested = False
+    
+        dut = self.config.dut_profile
+        if dut is None:
+>           raise RuntimeError("No DUT profile loaded ù call config.load_dut_profile() first")
+E           RuntimeError: No DUT profile loaded ù call config.load_dut_profile() first
+
+src\core\test_runner.py:234: RuntimeError
+________________ TestReportGeneration.test_html_report_renders ________________
+
+self = <tests.integration.test_smoke_suite.TestReportGeneration object at 0x0000024C4929B5D0>
+config_manager = <src.core.config_manager.ConfigManager object at 0x0000024C4D609990>
+session_manager = <src.core.session_manager.SessionManager object at 0x0000024C4D6504D0>
+validator = <src.core.result_validator.ResultValidator object at 0x0000024C4D609310>
+
+    @pytest.mark.asyncio
+    async def test_html_report_renders(
+        self,
+        config_manager: ConfigManager,
+        session_manager: SessionManager,
+        validator: ResultValidator,
+    ) -> None:
+        """HTML report should render from a smoke run without errors."""
+        runner = TestRunner(config_manager, session_manager, validator)
+>       report = await runner.run_suite(tier=TestTier.SMOKE)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\integration\test_smoke_suite.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.core.test_runner.TestRunner object at 0x0000024C4D643CD0>
+tier = <TestTier.SMOKE: 'smoke'>, sections = None, spec_ids = None
+
+    async def run_suite(
+        self,
+        tier: TestTier = TestTier.SMOKE,
+        sections: list[TestSection] | None = None,
+        spec_ids: list[str] | None = None,
+    ) -> TestSuiteReport:
+        """
+        Execute a full test suite.
+    
+        Args:
+            tier: Execution tier (smoke/core/full).
+            sections: Optional filter ù only run specs from these sections.
+            spec_ids: Optional filter ù only run these specific spec IDs.
+    
+        Returns:
+            TestSuiteReport with all results.
+        """
+        self._running = True
+        self._cancel_requested = False
+    
+        dut = self.config.dut_profile
+        if dut is None:
+>           raise RuntimeError("No DUT profile loaded ù call config.load_dut_profile() first")
+E           RuntimeError: No DUT profile loaded ù call config.load_dut_profile() first
+
+src\core\test_runner.py:234: RuntimeError
+_____________ TestReportGeneration.test_html_report_saves_to_file _____________
+
+self = <tests.integration.test_smoke_suite.TestReportGeneration object at 0x0000024C4929BD50>
+config_manager = <src.core.config_manager.ConfigManager object at 0x0000024C4D609990>
+session_manager = <src.core.session_manager.SessionManager object at 0x0000024C4D6504D0>
+validator = <src.core.result_validator.ResultValidator object at 0x0000024C4D609310>
+
+    @pytest.mark.asyncio
+    async def test_html_report_saves_to_file(
+        self,
+        config_manager: ConfigManager,
+        session_manager: SessionManager,
+        validator: ResultValidator,
+    ) -> None:
+        """Report should save to disk as an HTML file."""
+        runner = TestRunner(config_manager, session_manager, validator)
+>       report = await runner.run_suite(tier=TestTier.SMOKE)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\integration\test_smoke_suite.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.core.test_runner.TestRunner object at 0x0000024C4D660950>
+tier = <TestTier.SMOKE: 'smoke'>, sections = None, spec_ids = None
+
+    async def run_suite(
+        self,
+        tier: TestTier = TestTier.SMOKE,
+        sections: list[TestSection] | None = None,
+        spec_ids: list[str] | None = None,
+    ) -> TestSuiteReport:
+        """
+        Execute a full test suite.
+    
+        Args:
+            tier: Execution tier (smoke/core/full).
+            sections: Optional filter ù only run specs from these sections.
+            spec_ids: Optional filter ù only run these specific spec IDs.
+    
+        Returns:
+            TestSuiteReport with all results.
+        """
+        self._running = True
+        self._cancel_requested = False
+    
+        dut = self.config.dut_profile
+        if dut is None:
+>           raise RuntimeError("No DUT profile loaded ù call config.load_dut_profile() first")
+E           RuntimeError: No DUT profile loaded ù call config.load_dut_profile() first
+
+src\core\test_runner.py:234: RuntimeError
+============================== warnings summary ===============================
+src\core\test_runner.py:167
+  Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework\src\core\test_runner.py:167: PytestCollectionWarning: cannot collect test class 'TestRunner' because it has a __init__ constructor (from: tests/integration/test_smoke_suite.py)
+    class TestRunner:
+
+src\models\test_case.py:63
+  Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework\src\models\test_case.py:63: PytestCollectionWarning: cannot collect test class 'TestSection' because it has a __init__ constructor (from: tests/integration/test_smoke_suite.py)
+    class TestSection(str, enum.Enum):
+
+src\models\test_case.py:45
+  Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework\src\models\test_case.py:45: PytestCollectionWarning: cannot collect test class 'TestTier' because it has a __init__ constructor (from: tests/integration/test_smoke_suite.py)
+    class TestTier(str, enum.Enum):
+
+src\models\test_case.py:63
+  Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework\src\models\test_case.py:63: PytestCollectionWarning: cannot collect test class 'TestSection' because it has a __init__ constructor (from: tests/self_validation/test_self_validation.py)
+    class TestSection(str, enum.Enum):
+
+src\models\test_case.py:53
+  Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework\src\models\test_case.py:53: PytestCollectionWarning: cannot collect test class 'TestStatus' because it has a __init__ constructor (from: tests/self_validation/test_self_validation.py)
+    class TestStatus(str, enum.Enum):
+
+src\models\test_case.py:45
+  Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework\src\models\test_case.py:45: PytestCollectionWarning: cannot collect test class 'TestTier' because it has a __init__ constructor (from: tests/self_validation/test_self_validation.py)
+    class TestTier(str, enum.Enum):
+
+src\models\test_case.py:63
+  Z:\layer2_Ethernet_Testing\ethernet_layer2_testing\tc8-l2-test-framework\src\models\test_case.py:63: PytestCollectionWarning: cannot collect test class 'TestSection' because it has a __init__ constructor (from: tests/unit/test_spec_definitions.py)
+    class TestSection(str, enum.Enum):
+
+tests/self_validation/test_self_validation.py::TestFrameBuilderRoundtrip::test_tagged_frame_roundtrip
+  C:\Users\jayad\AppData\Local\Programs\Python\Python311\Lib\site-packages\scapy\packet.py:466: DeprecationWarning: id has been deprecated in favor of dei since 2.5.0 !
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_smoke_suite.py::TestSmokeRun::test_smoke_run_produces_report
+FAILED tests/integration/test_smoke_suite.py::TestReportGeneration::test_html_report_renders
+FAILED tests/integration/test_smoke_suite.py::TestReportGeneration::test_html_report_saves_to_file
+================== 3 failed, 44 passed, 8 warnings in 1.87s ===================

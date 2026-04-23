@@ -136,6 +136,71 @@ class ScapyInterface(BaseDUTInterface):
             payload_size=len(frame),
         )]
 
+    async def send_and_capture(
+        self,
+        test_case: TestCase,
+        timeout: float = 2.0,
+    ) -> tuple[list[FrameCapture], dict[int, list[FrameCapture]]]:
+        """
+        Atomic send-and-capture: start sniffers BEFORE sending the frame
+        so DUT-forwarded frames are not missed.
+
+        Returns:
+            (sent_frames, received_frames_per_port)
+        """
+        params = test_case.parameters
+        capture_ports = [pid for pid in self.ports if pid != params.ingress_port]
+        captures: dict[int, list[FrameCapture]] = {pid: [] for pid in capture_ports}
+
+        # Build packet handlers with closure over the correct list
+        def _make_handler(pid_local: int, cap_list: list[FrameCapture]):
+            def handler(pkt) -> None:
+                if Ether not in pkt:
+                    return
+                if params.dst_mac and pkt[Ether].dst.lower() != params.dst_mac.lower():
+                    return
+                cap_list.append(FrameCapture(
+                    port_id=pid_local,
+                    timestamp=time.time(),
+                    src_mac=pkt[Ether].src,
+                    dst_mac=pkt[Ether].dst,
+                    ethertype=pkt[Ether].type,
+                    vlan_tags=self._extract_vlan_tags(pkt),
+                    payload_size=len(pkt),
+                ))
+            return handler
+
+        # Start AsyncSniffers on all egress ports BEFORE sending
+        sniffers: dict[int, Any] = {}
+        for pid in capture_ports:
+            port = self.ports[pid]
+            sniffer = AsyncSniffer(
+                iface=port.interface_name,
+                prn=_make_handler(pid, captures[pid]),
+                store=False,
+                timeout=timeout,
+            )
+            sniffer.start()
+            sniffers[pid] = sniffer
+
+        # Brief settle to ensure sniffers are ready on the NIC
+        await asyncio.sleep(0.1)
+
+        # Send frame while sniffers are running
+        sent = await self.send_frame(test_case)
+
+        # Wait for all sniffers to finish their timeout
+        for pid, sniffer in sniffers.items():
+            try:
+                sniffer.join()
+            except Exception:
+                pass
+            logger.debug(
+                "Captured %d frames on port %d", len(captures[pid]), pid,
+            )
+
+        return sent, captures
+
     async def capture_frames(
         self,
         test_case: TestCase,
@@ -230,22 +295,33 @@ class ScapyInterface(BaseDUTInterface):
     # ── Frame Construction ────────────────────────────────────────────
 
     def _build_frame(self, test_case: TestCase) -> Any:
-        """Build a Scapy Ethernet frame based on test case parameters."""
-        params = test_case.parameters
+        """Build a Scapy Ethernet frame based on test case parameters.
 
-        # Base Ethernet header
-        frame = Ether(src=params.src_mac, dst=params.dst_mac)
+        TPID is placed on the Ether.type field (or the preceding Dot1Q.type
+        for inner tags).  The Dot1Q.type field carries the *next-header*
+        EtherType, which Scapy fills automatically from the payload.
+        """
+        params = test_case.parameters
+        pcp = getattr(params, "pcp", 0)
 
         # Add VLAN tags based on frame type
         if params.frame_type == FrameType.SINGLE_TAGGED:
-            frame = frame / Dot1Q(vlan=params.vid, type=params.tpid)
+            # TPID goes on Ether.type; Dot1Q.type is auto-set by Scapy
+            frame = Ether(src=params.src_mac, dst=params.dst_mac, type=params.tpid)
+            frame = frame / Dot1Q(vlan=params.vid, prio=pcp)
 
         elif params.frame_type == FrameType.DOUBLE_TAGGED:
-            # Outer (S-VLAN) + Inner (C-VLAN)
+            # Outer S-VLAN TPID on Ether.type, inner C-VLAN TPID on outer Dot1Q.type
             outer_tpid = 0x88A8
             inner_vid = params.custom.get("inner_vid", params.vid)
-            frame = frame / Dot1Q(vlan=params.vid, type=outer_tpid)
-            frame = frame / Dot1Q(vlan=inner_vid, type=0x8100)
+            inner_pcp = params.custom.get("inner_pcp", 0)
+            frame = Ether(src=params.src_mac, dst=params.dst_mac, type=outer_tpid)
+            frame = frame / Dot1Q(vlan=params.vid, prio=pcp, type=0x8100)
+            frame = frame / Dot1Q(vlan=inner_vid, prio=inner_pcp)
+
+        else:
+            # Untagged
+            frame = Ether(src=params.src_mac, dst=params.dst_mac)
 
         # Add protocol payload
         if params.protocol == "arp":
@@ -263,12 +339,19 @@ class ScapyInterface(BaseDUTInterface):
 
     @staticmethod
     def _extract_vlan_tags(pkt: Any) -> list[dict[str, Any]]:
-        """Extract VLAN tag information from a captured packet."""
+        """Extract VLAN tag information from a captured packet.
+
+        The TPID is the EtherType of the layer *preceding* the Dot1Q
+        header (Ether.type for the first tag, outer Dot1Q.type for
+        nested tags).  Dot1Q.type is the *next-header* EtherType.
+        """
         tags: list[dict[str, Any]] = []
 
         if not SCAPY_AVAILABLE:
             return tags
 
+        # The TPID for the first Dot1Q is in the Ether.type field
+        preceding_type = pkt[Ether].type if Ether in pkt else 0
         layer = pkt
         while layer:
             if Dot1Q in layer:
@@ -277,8 +360,9 @@ class ScapyInterface(BaseDUTInterface):
                     "vid": dot1q.vlan,
                     "pcp": dot1q.prio,
                     "dei": dot1q.id,
-                    "tpid": dot1q.type,
+                    "tpid": preceding_type,
                 })
+                preceding_type = dot1q.type  # next tag's TPID
                 layer = dot1q.payload
             else:
                 break

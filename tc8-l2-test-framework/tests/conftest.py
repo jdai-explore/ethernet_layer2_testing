@@ -28,10 +28,11 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 
 @pytest.fixture(scope="session")
-def config_manager() -> ConfigManager:
+def config_manager(dut_profile: DUTProfile) -> ConfigManager:
     """Session-scoped ConfigManager with all spec definitions loaded."""
     cm = ConfigManager(config_dir=CONFIG_DIR, data_dir=DATA_DIR)
     cm.load_spec_definitions()
+    cm._dut_profile = dut_profile
     return cm
 
 
