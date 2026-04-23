@@ -155,12 +155,35 @@ class ConfigManager:
     def load_dut_profile(self, profile_path: Path | str) -> DUTProfile:
         """Load a DUT configuration profile from YAML."""
         path = Path(profile_path)
-        
-        # If path doesn't exist as-is and is not absolute, try relative to dut_profiles/
-        if not path.is_absolute() and not path.exists():
-            path = self.config_dir / "dut_profiles" / path
-            
-        raw = self._load_yaml(path)
+
+        # Build an ordered list of candidate paths to try
+        candidates: list[Path] = []
+        if path.is_absolute():
+            candidates = [path]
+        else:
+            candidates = [
+                path,                                             # as-is (relative to CWD)
+                self.config_dir.parent / path,                   # project_root / "config/dut_profiles/foo.yaml"
+                self.config_dir / path,                          # config_dir / "config/dut_profiles/foo.yaml"
+                self.config_dir / "dut_profiles" / path,         # config_dir / "dut_profiles" / "foo.yaml"
+                self.config_dir / "dut_profiles" / path.name,    # config_dir / "dut_profiles" / "foo.yaml" (stem only)
+            ]
+
+        resolved: Path | None = None
+        for candidate in candidates:
+            if candidate.exists():
+                resolved = candidate
+                break
+
+        if resolved is None:
+            raise FileNotFoundError(
+                f"DUT profile not found: '{profile_path}'. Tried: {[str(c) for c in candidates]}"
+            )
+
+        raw = self._load_yaml(resolved)
+        if not raw:
+            raise ValueError(f"DUT profile YAML is empty or could not be parsed: {resolved}")
+
         ports = [PortConfig(**p) for p in raw.pop("ports", [])]
         self._dut_profile = DUTProfile(ports=ports, **raw)
         logger.info("Loaded DUT profile: %s (%d ports)", self._dut_profile.name, self._dut_profile.port_count)
