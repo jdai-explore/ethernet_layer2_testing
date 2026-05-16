@@ -6,7 +6,10 @@
       "Bash(Select-Object -First 5)",
       "Bash(python -c ' *)",
       "Bash(python -m pytest tests/ -v --tb=short)",
-      "Bash(python -m pytest tests/ -q)"
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(Get-ChildItem -Recurse \"Z:\\\\layer2_Ethernet_Testing\\\\ethernet_layer2_testing\\\\tc8-l2-test-framework\\\\tests\")",
+      "Bash(Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Recurse \"Z:\\\\layer2_Ethernet_Testing\\\\ethernet_layer2_testing\\\\tc8-l2-test-framework\\\\tests\" | ForEach-Object { $_.FullName })"
     ]
   }
 }

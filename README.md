@@ -61,8 +61,10 @@ python -m src.cli run \
 
 ## Documentation
 
-- **[User Guide](tc8-l2-test-framework/docs/user_guide.md)** — Install → what the app does → minimum test setup → ECU setup verification → DUT profile config → running tests → debugging → downloading reports
-- **[Known Limitations](tc8-l2-test-framework/docs/known_limitations.md)** — Incomplete features, hardware constraints, and path to resolution for each
+See **[docs/index.md](tc8-l2-test-framework/docs/index.md)** for the full navigation index, or jump directly to:
+
+- **[User Guide](tc8-l2-test-framework/docs/user_guide.md)** — Install → setup → running tests → debugging → reports
+- **[Known Limitations](tc8-l2-test-framework/docs/known_limitations.md)** — Incomplete features, hardware constraints, path to resolution
 - **[Quick Start Tutorial](tc8-l2-test-framework/docs/tutorials/01_quick_start.md)** — 5-minute simulation run
 - **[DUT Profile Tutorial](tc8-l2-test-framework/docs/tutorials/02_custom_dut_profile.md)** — Physical wiring and YAML configuration
 
