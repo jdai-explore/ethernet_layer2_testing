@@ -2,7 +2,7 @@
 
 This directory contains the framework package. For full setup and usage instructions, see:
 
-- **[Root README](../../README.md)** — Project overview, quick install, architecture
+- **[Root PRD](docs/PRD.md)** — Project overview, quick install, architecture
 - **[User Guide](docs/user_guide.md)** — Complete operational guide (install → run → debug → reports)
 - **[Quick Start Tutorial](docs/tutorials/01_quick_start.md)** — 5-minute simulation run
 - **[DUT Profile Tutorial](docs/tutorials/02_custom_dut_profile.md)** — Wiring and YAML configuration
