@@ -4,24 +4,37 @@
 
 A modular, open-architecture test framework for validating Layer 2 switching behavior of automotive Ethernet ECUs against the OPEN Alliance TC8 Automotive Ethernet ECU Test Specification — Layer 2, v3.0.
 
-[![Tests](https://img.shields.io/badge/tests-47%2F47%20passing-success)](tc8-l2-test-framework/tests/)
+[![Tests](https://img.shields.io/badge/tests-52%2F52%20passing-success)](tc8-l2-test-framework/tests/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ## What It Tests
 
-71 TC8 specifications across 7 sections:
+**104 specifications** — 71 TC8 v3.0 conformance specs + 33 extended automotive tests:
 
-| Section | Topic | Specs |
-|---------|-------|-------|
-| 5.3 | VLAN Testing | 21 |
-| 5.4 | General Switching | 10 |
-| 5.5 | Address Learning | 21 |
-| 5.6 | Filtering | 11 |
-| 5.7 | Time Synchronization | 1 |
-| 5.8 | Quality of Service | 4 |
-| 5.9 | Configuration | 3 |
-| **Total** | | **71 specs → 200,000+ test cases** |
+### TC8 v3.0 Conformance (SWITCH_*)
+
+| Section | Topic | Specs | PC+DUT |
+|---------|-------|-------|--------|
+| 5.3 | VLAN Testing | 21 | ✅ |
+| 5.4 | General Switching | 10 | ✅ (Linux only for runt frames) |
+| 5.5 | Address Learning | 21 | ✅ |
+| 5.6 | Filtering | 11 | ⚠️ storm control needs tgen |
+| 5.7 | Time Synchronization | 1 | ❌ TSN NIC required |
+| 5.8 | Quality of Service | 4 | ⚠️ rate accuracy needs tgen |
+| 5.9 | Configuration | 3 | ✅ |
+
+### Extended Automotive Tests (EXT_*)
+
+| Prefix | Topic | Specs | PC+DUT |
+|--------|-------|-------|--------|
+| EXT_TSN | TSN / gPTP deeper support | 10 | ❌ TSN NIC required |
+| EXT_PHY | Automotive PHY layer | 8 | ⚠️ link flap only |
+| EXT_MGMT | DUT management / DoIP | 5 | ⚠️ DoIP not yet implemented |
+| EXT_ORACLE | Golden device / virtual oracle | 4 | ✅ Linux virtual bridge |
+| EXT_PERF | Performance / traffic generation | 6 | ⚠️ basic burst only |
+
+> Tests that require unavailable hardware return `SKIP` or `INFORMATIONAL` — never `ERROR`. The web UI shows per-section hardware badges and warns before running hardware-gated sections. See [Known Limitations](tc8-l2-test-framework/docs/known_limitations.md).
 
 Three execution tiers: **smoke** (~1 h) / **core** (~8 h) / **full** (40+ h)
 
@@ -49,6 +62,7 @@ python -m src.cli run \
 ## Documentation
 
 - **[User Guide](tc8-l2-test-framework/docs/user_guide.md)** — Install → what the app does → minimum test setup → ECU setup verification → DUT profile config → running tests → debugging → downloading reports
+- **[Known Limitations](tc8-l2-test-framework/docs/known_limitations.md)** — Incomplete features, hardware constraints, and path to resolution for each
 - **[Quick Start Tutorial](tc8-l2-test-framework/docs/tutorials/01_quick_start.md)** — 5-minute simulation run
 - **[DUT Profile Tutorial](tc8-l2-test-framework/docs/tutorials/02_custom_dut_profile.md)** — Physical wiring and YAML configuration
 
@@ -58,15 +72,15 @@ python -m src.cli run \
 tc8-l2-test-framework/
 ├── src/
 │   ├── core/           # Test runner, config manager, session manager, result validator
-│   ├── specs/          # Test specification implementations (7 TC8 sections)
+│   ├── specs/          # Spec handlers: 7 TC8 sections + 5 EXT_* extended sections
 │   ├── reporting/      # HTML report generator, SQLite result store
-│   ├── interface/      # DUT communication (Scapy, raw socket, TCP stub, NullDUT)
-│   └── models/         # Pydantic data models
-├── web/                # FastAPI backend + web UI (6-tab dashboard)
+│   ├── interface/      # DUT communication + traffic generation (Scapy, BaseTrafficGen)
+│   └── models/         # Pydantic data models (TestCase, SetupRequirement, …)
+├── web/                # FastAPI backend + web UI (6-tab dashboard, hardware badges)
 ├── config/             # DUT profile YAMLs and framework defaults
-├── data/               # 71 spec definition YAML files
-├── tests/              # Self-validation suite (47 tests)
-└── docs/               # User guide and tutorials
+├── data/               # 104 spec definition YAML files (71 TC8 + 33 EXT_*)
+├── tests/              # Self-validation suite (52 tests)
+└── docs/               # User guide, tutorials, known limitations
 ```
 
 ## DUT Interface Options

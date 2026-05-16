@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from src.models.test_case import (
     DUTProfile,
     PortConfig,
+    SetupRequirement,
     TestSection,
     TestSpecDefinition,
     TestTier,
@@ -224,7 +225,16 @@ class ConfigManager:
                     "5.7": TestSection.TIME_SYNC,
                     "5.8": TestSection.QOS,
                     "5.9": TestSection.CONFIGURATION,
+                    "ext.tsn": TestSection.EXT_TSN,
+                    "ext.phy": TestSection.EXT_PHY,
+                    "ext.mgmt": TestSection.EXT_MGMT,
+                    "ext.oracle": TestSection.EXT_ORACLE,
+                    "ext.perf": TestSection.EXT_PERF,
                 }
+                # EXT_* specs use tc8_reference like "ext.tsn" directly
+                tc8_ref = spec_data.get("tc8_reference", "5.4")
+                if tc8_ref.startswith("ext."):
+                    section_key = tc8_ref
                 section = section_map.get(section_key, TestSection.GENERAL)
 
                 # Timing tier
@@ -235,11 +245,21 @@ class ConfigManager:
                     )
                 timing = TimingTier(timing_str) if timing_str in [t.value for t in TimingTier] else TimingTier.TIER_A
 
+                # Setup requirement
+                req_str = spec_data.pop("setup_requirement", "pc_only")
+                if req_str not in [r.value for r in SetupRequirement]:
+                    logger.warning(
+                        "Unknown setup_requirement %r in spec %s — defaulting to PC_ONLY", req_str, spec_id
+                    )
+                    req_str = "pc_only"
+                setup_req = SetupRequirement(req_str)
+
                 self._spec_definitions[spec_id] = TestSpecDefinition(
                     spec_id=spec_id,
                     section=section,
                     timing_tier=timing,
-                    **{k: v for k, v in spec_data.items() if k != "timing_tier"},
+                    setup_requirement=setup_req,
+                    **{k: v for k, v in spec_data.items() if k not in ("timing_tier", "setup_requirement")},
                 )
 
         logger.info("Loaded %d spec definitions from %s", len(self._spec_definitions), self.spec_dir)
@@ -278,6 +298,11 @@ class ConfigManager:
                         "5.7": TestSection.TIME_SYNC,
                         "5.8": TestSection.QOS,
                         "5.9": TestSection.CONFIGURATION,
+                        "ext.tsn": TestSection.EXT_TSN,
+                        "ext.phy": TestSection.EXT_PHY,
+                        "ext.mgmt": TestSection.EXT_MGMT,
+                        "ext.oracle": TestSection.EXT_ORACLE,
+                        "ext.perf": TestSection.EXT_PERF,
                     }
                     if section_str in section_map:
                         specs.extend(self.get_specs_for_section(section_map[section_str]))

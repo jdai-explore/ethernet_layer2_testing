@@ -1,0 +1,256 @@
+---
+# Extended TSN / gPTP Test Specifications
+# Section: EXT_TSN — Beyond TC8 v3.0, requires TSN-capable NIC with hardware timestamping
+# Spec ID format: EXT_TSN_NNN
+# All specs in this section require setup_requirement: tsn_nic
+
+EXT_TSN_001:
+  tc8_reference: "ext.tsn"
+  title: "gPTP Sync Frame Interval Measurement"
+  description: >
+    Verify that the DUT transmits IEEE 802.1AS Sync frames at the configured interval
+    (default 125 ms). Measures the actual interval between consecutive Sync frames
+    to ±100 µs accuracy. Requires hardware timestamping NIC.
+  priority: high
+  timing_tier: tier_b
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires a hardware-timestamping NIC (e.g., Intel i210, i225, or Microchip LAN9668).
+    Standard PC NICs give ±1 ms timing — 10× worse than the 125 ms Sync interval tolerance.
+    Not runnable on a basic PC + standard NIC setup.
+  parameters:
+    sync_interval_ms: 125
+  preconditions:
+    - "DUT configured as gPTP master or boundary clock"
+    - "Hardware-timestamping NIC installed on test station"
+  test_procedure:
+    - "Capture 100 consecutive Sync frames using hardware timestamps"
+    - "Compute inter-frame intervals"
+    - "Verify mean interval is 125 ms ± 1 ms"
+  expected_result:
+    sync_interval_ms: 125
+    tolerance_ms: 1.0
+
+EXT_TSN_002:
+  tc8_reference: "ext.tsn"
+  title: "Residence Time Measurement (802.1AS §11)"
+  description: >
+    Measure the time a Sync frame resides inside the DUT switch before being
+    forwarded. The DUT should update the correctionField accordingly.
+    Verifies IEEE 802.1AS-2020 §11 residence time correction behavior.
+  priority: high
+  timing_tier: tier_c
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires sub-microsecond hardware timestamps on ingress and egress ports.
+    Residence time is typically 1–10 µs — impossible to measure with standard NIC
+    (±1 ms noise). Requires Intel i210/i225, FPGA, or dedicated TSN test hardware.
+  parameters: {}
+  preconditions:
+    - "TSN NIC with hardware timestamps on both test ports"
+    - "DUT operating as transparent clock or boundary clock"
+  test_procedure:
+    - "Inject Sync frame with known correctionField=0 on ingress port"
+    - "Capture forwarded frame on egress port with hardware timestamp"
+    - "Verify correctionField was incremented by residence time"
+  expected_result:
+    correction_field_updated: true
+    max_residence_time_us: 50
+
+EXT_TSN_003:
+  tc8_reference: "ext.tsn"
+  title: "Follow-Up Correction Field Accuracy"
+  description: >
+    Verify that Follow_Up messages contain correctionField values that accurately
+    reflect the two-step clock's path delay compensation.
+  priority: medium
+  timing_tier: tier_c
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires hardware timestamping NIC. correctionField accuracy is sub-nanosecond;
+    software timestamps are orders of magnitude too noisy.
+  parameters: {}
+  preconditions:
+    - "DUT configured as two-step gPTP clock"
+    - "TSN NIC with hardware timestamps"
+  test_procedure:
+    - "Capture Sync + Follow_Up pair"
+    - "Verify correctionField in Follow_Up compensates for measured path delay"
+  expected_result:
+    correction_field_accurate: true
+
+EXT_TSN_004:
+  tc8_reference: "ext.tsn"
+  title: "802.1Qav Credit-Based Shaping (CBS)"
+  description: >
+    Verify that the DUT implements Credit-Based Shaping (802.1Qav) correctly,
+    allowing SR Class A and B streams to meet their latency budgets under
+    background traffic load.
+  priority: medium
+  timing_tier: tier_b
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires a TSN-capable NIC that can generate Class A/B streams at precise rates
+    and measure latency with hardware timestamps. Standard Scapy burst cannot
+    generate sustained rate-limited streams for CBS validation.
+  parameters:
+    class_a_max_latency_us: 2000
+    class_b_max_latency_us: 10000
+  preconditions:
+    - "DUT supports 802.1Qav CBS"
+    - "TSN NIC for precise rate generation"
+  test_procedure:
+    - "Configure background traffic to 70% port utilization"
+    - "Inject Class A stream at 75 Mbps"
+    - "Measure Class A frame latency under load"
+    - "Verify latency stays within 2 ms bound"
+  expected_result:
+    class_a_latency_met: true
+
+EXT_TSN_005:
+  tc8_reference: "ext.tsn"
+  title: "802.1Qbv Time-Aware Shaping (TAS) Gate Control"
+  description: >
+    Verify that the DUT's 802.1Qbv gate schedule opens and closes queues at the
+    correct times, providing deterministic delivery windows for scheduled traffic.
+  priority: high
+  timing_tier: tier_c
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires a hardware-timestamping NIC synchronized to the DUT's gPTP clock.
+    Gate open/close events occur on microsecond boundaries — impossible to observe
+    with standard NIC software timestamps.
+  parameters:
+    cycle_time_us: 1000
+    gate_open_window_us: 500
+  preconditions:
+    - "DUT supports 802.1Qbv TAS"
+    - "DUT and test NIC synchronized via gPTP"
+    - "TSN NIC with hardware timestamps"
+  test_procedure:
+    - "Program gate schedule: queue 7 open 0–500 µs, closed 500–1000 µs"
+    - "Inject frames into queue 7 at random times"
+    - "Verify all frames transmitted only during gate-open window"
+  expected_result:
+    gate_schedule_respected: true
+
+EXT_TSN_006:
+  tc8_reference: "ext.tsn"
+  title: "802.1Qci Per-Stream Filtering and Policing"
+  description: >
+    Verify that the DUT enforces per-stream bandwidth limits and drops frames
+    that violate the configured stream contract (PSFP).
+  priority: medium
+  timing_tier: tier_b
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires precise traffic generation to measure policing thresholds.
+    Standard Scapy burst is not rate-accurate enough for PSFP boundary tests.
+  parameters: {}
+  preconditions:
+    - "DUT supports 802.1Qci PSFP"
+    - "TSN NIC for precise rate generation"
+  test_procedure:
+    - "Configure stream filter for 10 Mbps max rate"
+    - "Send stream at 9 Mbps — verify all frames forwarded"
+    - "Send stream at 11 Mbps — verify excess frames dropped"
+  expected_result:
+    under_rate_forwarded: true
+    over_rate_dropped: true
+
+EXT_TSN_007:
+  tc8_reference: "ext.tsn"
+  title: "Path Delay Measurement (802.1AS Peer Delay)"
+  description: >
+    Measure the one-way propagation delay between test station and DUT using
+    the IEEE 802.1AS Peer Delay Request/Response mechanism.
+  priority: medium
+  timing_tier: tier_c
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires hardware timestamping NIC. Path delay is typically 100–500 ns;
+    standard NIC timestamps have ±1 ms noise — 6000× the signal.
+  parameters: {}
+  preconditions:
+    - "TSN NIC with hardware timestamps"
+    - "DUT configured as gPTP participant"
+  test_procedure:
+    - "Exchange 10 Peer Delay Request/Response pairs"
+    - "Compute mean path delay"
+    - "Verify path delay is consistent (< 100 ns variance)"
+  expected_result:
+    path_delay_stable: true
+    max_variance_ns: 100
+
+EXT_TSN_008:
+  tc8_reference: "ext.tsn"
+  title: "gPTP Master-Slave Role Negotiation (BMCA)"
+  description: >
+    Verify that the DUT participates correctly in the Best Master Clock Algorithm
+    (BMCA), negotiating grandmaster selection based on clock quality attributes.
+  priority: high
+  timing_tier: tier_a
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    BMCA message exchange (Announce frames) can be observed with standard NIC.
+    Hardware timestamps required only if verifying timing precision of elected master.
+  parameters: {}
+  preconditions:
+    - "Two gPTP participants: DUT + test station"
+  test_procedure:
+    - "Enable gPTP on both DUT and test station"
+    - "Wait for BMCA to complete (max 10 s)"
+    - "Verify Announce frames declare correct grandmaster"
+  expected_result:
+    master_elected: true
+    announce_interval_s: 1.0
+
+EXT_TSN_009:
+  tc8_reference: "ext.tsn"
+  title: "Clock Rate Offset Measurement"
+  description: >
+    Measure the frequency offset between the DUT's clock and the grandmaster.
+    After synchronization, the DUT's clock rate offset should be < 1 ppm.
+  priority: medium
+  timing_tier: tier_c
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Requires hardware timestamping NIC and long-duration (> 60 s) measurement
+    for sub-ppm accuracy. Not feasible with standard NIC software timestamps.
+  parameters:
+    max_clock_offset_ppm: 1.0
+  preconditions:
+    - "TSN NIC with hardware timestamps"
+    - "DUT synchronized to known-good grandmaster"
+  test_procedure:
+    - "Record Sync frame timestamps over 60 s"
+    - "Compute DUT clock rate relative to grandmaster"
+    - "Verify offset < 1 ppm"
+  expected_result:
+    clock_offset_within_spec: true
+
+EXT_TSN_010:
+  tc8_reference: "ext.tsn"
+  title: "Announce / Sync Message Timeout Handling"
+  description: >
+    Verify DUT behavior when Announce or Sync messages stop arriving.
+    The DUT should detect the loss within announceReceiptTimeout intervals
+    and initiate a new BMCA election.
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: tsn_nic
+  hardware_requirement_detail: >
+    Announce/Sync timeout detection uses software-observable state machine.
+    Standard NIC is sufficient for this test. TSN NIC not strictly required.
+  parameters:
+    announce_receipt_timeout_s: 3.0
+  preconditions:
+    - "DUT operating as gPTP slave"
+    - "Test station acting as grandmaster"
+  test_procedure:
+    - "Test station sends Announce frames normally for 5 s"
+    - "Stop Announce frames"
+    - "Verify DUT initiates new BMCA within 3 s (announceReceiptTimeout)"
+  expected_result:
+    timeout_detected: true
+    bmca_restarted: true

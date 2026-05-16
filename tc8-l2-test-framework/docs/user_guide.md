@@ -12,6 +12,7 @@
 6. [Running Tests](#6-running-tests)
 7. [Debugging](#7-debugging)
 8. [Downloading Reports](#8-downloading-reports)
+9. [Known Limitations & Incomplete Features](#9-known-limitations--incomplete-features)
 
 ---
 
@@ -59,7 +60,7 @@ docker-compose up -d
 
 ```bash
 python -m pytest tests/ -v
-# Expected: 47 passed
+# Expected: 52 passed
 ```
 
 ---
@@ -68,18 +69,36 @@ python -m pytest tests/ -v
 
 The TC8 Layer 2 Test Framework validates automotive Ethernet ECU switching behavior against the **OPEN Alliance TC8 specification v3.0**. It sends and captures raw Ethernet frames via connected NICs and checks that the DUT (Device Under Test — your ECU's Ethernet switch) behaves exactly as the TC8 spec requires.
 
-### Spec Coverage
+### TC8 v3.0 Conformance Tests (SWITCH_*)
 
-| TC8 Section | Topic | Specs |
-|---|---|---|
-| 5.3 | VLAN Testing (tagging, PVID, trunks, double-tagging) | 21 |
-| 5.4 | General Switching (unicast, broadcast, frame sizes) | 10 |
-| 5.5 | Address Learning (MAC table, aging, port migration) | 21 |
-| 5.6 | Filtering (unicast/multicast/broadcast filtering) | 11 |
-| 5.7 | Time Synchronization (gPTP prerequisites) | 1 |
-| 5.8 | Quality of Service (PCP priority queuing) | 4 |
-| 5.9 | Configuration (startup, persistence) | 3 |
-| **Total** | | **71 specs → 200,000+ test cases** |
+| TC8 Section | Topic | Specs | Runnable on PC+DUT |
+|---|---|---|---|
+| 5.3 | VLAN Testing (tagging, PVID, trunks, double-tagging) | 21 | ✅ All |
+| 5.4 | General Switching (unicast, broadcast, frame sizes) | 10 | ✅ (runt frames: Linux only) |
+| 5.5 | Address Learning (MAC table, aging, port migration) | 21 | ✅ All |
+| 5.6 | Filtering (unicast/multicast/broadcast filtering) | 11 | ⚠️ Storm control needs tgen |
+| 5.7 | Time Synchronization (gPTP prerequisites) | 1 | ❌ TSN NIC required |
+| 5.8 | Quality of Service (PCP priority queuing) | 4 | ⚠️ Rate accuracy needs tgen |
+| 5.9 | Configuration (startup, persistence) | 3 | ✅ All |
+| **TC8 Total** | | **71** | |
+
+### Extended Automotive Tests (EXT_*)
+
+These tests go beyond TC8 scope but are essential for automotive ECU validation programs. They use the `EXT_<CATEGORY>_NNN` ID format to be clearly distinct from TC8 compliance specs.
+
+| Prefix | Topic | Specs | Runnable on PC+DUT |
+|---|---|---|---|
+| EXT_TSN | TSN / gPTP (802.1AS, Qbv, Qav, Qci) | 10 | ❌ TSN NIC required |
+| EXT_PHY | Automotive PHY (100BASE-T1, 1000BASE-T1) | 8 | ⚠️ Link flap only (EXT_PHY_002) |
+| EXT_MGMT | DUT management channel (DoIP/UDS) | 5 | ⚠️ DoIP not yet implemented |
+| EXT_ORACLE | Golden device / virtual oracle | 4 | ✅ Linux virtual bridge |
+| EXT_PERF | Performance / traffic generation | 6 | ⚠️ Basic burst only |
+| **EXT_* Total** | | **33** | |
+| **Grand Total** | | **104 specs → 200,000+ test cases** | |
+
+> Tests that require unavailable hardware return **SKIP** (hardware absent) or **INFORMATIONAL** (partially observable). They never return ERROR due to a missing device. The web UI shows hardware badges per section and warns before running hardware-gated tests.
+>
+> For the full list of incomplete features and the path to completing them, see [docs/known_limitations.md](known_limitations.md).
 
 ### Execution Tiers
 
@@ -87,7 +106,7 @@ The TC8 Layer 2 Test Framework validates automotive Ethernet ECU switching behav
 |------|----------|-------|-------------|
 | **smoke** | ~1 hour | 10 | Quick validation, CI/CD gate |
 | **core** | ~8 hours | 52 | Nightly regression |
-| **full** | 40+ hours | 71 | Pre-release compliance |
+| **full** | 40+ hours | 104 | Pre-release compliance (includes EXT_*) |
 
 ### Outputs
 
@@ -422,10 +441,20 @@ Open `http://localhost:8000` and use the **Run Tests** tab:
 
 1. Select DUT profile from the dropdown (or create one in the **DUT Configuration** tab)
 2. Select test tier (smoke / core / full)
-3. Optionally filter by TC8 section
-4. Click **Start Test**
+3. Choose sections — each section shows a hardware badge:
+
+   | Badge | Meaning |
+   |---|---|
+   | **PC+DUT** (green) | Runs reliably on any setup |
+   | **Linux req.** (yellow) | Requires Linux AF_PACKET or bridge-utils |
+   | **Tgen needed** (orange) | Results are indicative; accurate measurement needs dedicated traffic generator |
+   | **HW required** (red) | Will always return SKIP on a basic PC+DUT setup |
+
+4. Click **Start Test** — if any selected sections include hardware-gated tests, a **pre-run warning dialog** appears listing which specs will be SKIP/INFORMATIONAL and why. Choose **Run All**, **Skip HW-Gated Tests**, or **Cancel**.
 5. Watch the progress bar and live result stream
 6. Click the report link when the run completes
+
+> **EXT_* sections are unchecked by default.** Tick them to include extended automotive tests. Be aware of their hardware requirements shown by the badge.
 
 ### Stopping a Run
 
@@ -494,9 +523,20 @@ sudo setcap cap_net_raw,cap_net_admin=eip $(which python)
 |---|---|---|
 | **PASS** | DUT behaved as TC8 requires | None |
 | **FAIL** | DUT violated a TC8 requirement | Investigate DUT config or firmware |
-| **INFORMATIONAL** | Observation logged, no pass/fail verdict | Review for context |
-| **SKIP** | Test not applicable (hardware not connected, feature not supported) | Acceptable if DUT doesn't support the feature |
+| **INFORMATIONAL** | Observation logged, no pass/fail verdict (e.g. hardware partially observable) | Review for context; not a compliance verdict |
+| **SKIP** | Test not applicable — hardware not connected, feature disabled, or hardware-gated spec on a PC+DUT setup | Acceptable when the reason is expected (see below) |
 | **ERROR** | Framework exception, not a DUT fault | Check logs; may indicate misconfiguration |
+
+**SKIP is expected (not a problem) for:**
+- `SWITCH_TIME_001` — gPTP requires a TSN NIC with hardware timestamps
+- `SWITCH_GEN_007` — runt frame injection requires Linux or hardware tgen
+- All `EXT_TSN_*` — require TSN NIC (EXT_TSN_010 returns INFORMATIONAL instead)
+- Most `EXT_PHY_*` — require media converter or PHY hardware
+- `EXT_PERF_001/002/003/004/005` — require dedicated traffic generator
+
+**SKIP is unexpected (investigate) for:**
+- Any `SWITCH_VLAN_*`, `SWITCH_ADDR_*`, `SWITCH_GEN_001–006` — should always run on PC+DUT
+- Any spec with a `setup_requirement: pc_only` where the DUT profile is loaded correctly
 
 ### Common FAIL Patterns
 
@@ -552,3 +592,24 @@ python -m src.cli history --limit 10
 # Re-generate HTML for a specific run
 python -m src.cli report <report-id>
 ```
+
+---
+
+## 9. Known Limitations & Incomplete Features
+
+The framework is under active development. Several features are partially implemented or require hardware that may not be available in your setup.
+
+**Key incomplete items (summary):**
+
+| Feature | Status |
+|---|---|
+| Hardware traffic generator (line-rate, accurate pps) | Not built — `ScapyTrafficGen` provides burst-only at ±30% accuracy |
+| TSN / gPTP hardware timestamping | Not built — all EXT_TSN_* return SKIP |
+| Automotive PHY media converter control | Not built — EXT_PHY_002 (link flap via psutil) is the only runnable PHY test |
+| DoIP / UDS client for ECU management | Not built — EXT_MGMT_001/002 return INFORMATIONAL |
+| Virtual oracle (Linux bridge / OVS integration) | Not built — EXT_ORACLE_001–003 return INFORMATIONAL on Linux |
+| PCAP capture export (`.pcap` files alongside results) | Not built |
+| Traceability matrix CSV export | Not built |
+| PCP / payload size parameter expansion | Partial — test cases use PCP=0 and fixed payload size |
+
+For the full list with root causes, impact analysis, and path-to-resolution for each item, see **[docs/known_limitations.md](known_limitations.md)**.

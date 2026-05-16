@@ -173,7 +173,16 @@ SECTION_MAP = {
     "5.7": TestSection.TIME_SYNC,
     "5.8": TestSection.QOS,
     "5.9": TestSection.CONFIGURATION,
+    "ext.tsn": TestSection.EXT_TSN,
+    "ext.phy": TestSection.EXT_PHY,
+    "ext.mgmt": TestSection.EXT_MGMT,
+    "ext.oracle": TestSection.EXT_ORACLE,
+    "ext.perf": TestSection.EXT_PERF,
 }
+
+# Setup requirements that need hardware beyond a basic PC+DUT setup
+_HW_REQUIRED_REQS = {"tsn_nic", "media_converter", "specialized_hw", "physical", "dut_reset"}
+_HW_PARTIAL_REQS = {"tgen", "linux_raw"}
 
 
 # ---------------------------------------------------------------------------
@@ -204,11 +213,56 @@ async def list_specs(section: str | None = None) -> SpecListResponse:
             "title": s.title,
             "description": s.description,
             "priority": s.priority,
+            "setup_requirement": s.setup_requirement.value,
+            "hardware_requirement_detail": s.hardware_requirement_detail,
         }
         for s in specs
     ]
 
     return SpecListResponse(specs=spec_dicts, total=len(spec_dicts))
+
+
+@app.get("/api/hardware-check")
+async def hardware_check(sections: str | None = None) -> dict:
+    """
+    Return hardware-gated specs for the requested sections.
+
+    Query param: sections — comma-separated section keys (e.g. "5.7,ext.tsn")
+    Returns lists of specs grouped by hardware requirement level so the UI
+    can show a pre-run warning dialog before the user starts a test run.
+    """
+    config.load_spec_definitions()
+    all_specs = list(config.spec_definitions.values())
+
+    if sections:
+        requested = set(sections.split(","))
+        requested_sections = {SECTION_MAP[s] for s in requested if s in SECTION_MAP}
+        all_specs = [s for s in all_specs if s.section in requested_sections]
+
+    hw_required = []
+    hw_partial = []
+    for s in all_specs:
+        req = s.setup_requirement.value
+        if req in _HW_REQUIRED_REQS:
+            hw_required.append({
+                "spec_id": s.spec_id,
+                "title": s.title,
+                "setup_requirement": req,
+                "detail": s.hardware_requirement_detail or f"{s.spec_id} requires {req} hardware.",
+            })
+        elif req in _HW_PARTIAL_REQS:
+            hw_partial.append({
+                "spec_id": s.spec_id,
+                "title": s.title,
+                "setup_requirement": req,
+                "detail": s.hardware_requirement_detail or f"{s.spec_id} has limited accuracy on PC+DUT setup.",
+            })
+
+    return {
+        "hardware_required": hw_required,
+        "hardware_partial": hw_partial,
+        "total_gated": len(hw_required) + len(hw_partial),
+    }
 
 
 @app.post("/api/run", response_model=RunSuiteResponse)
@@ -887,6 +941,41 @@ async def index() -> str:
                 font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
                 background: #334155; color: #e2e8f0;
             }}
+            .hw-badge {{
+                display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
+                font-size: 0.68rem; font-weight: 600; margin-left: 0.4rem;
+                vertical-align: middle;
+            }}
+            .hw-badge.green  {{ background: #14532d; color: #86efac; }}
+            .hw-badge.yellow {{ background: #713f12; color: #fde68a; }}
+            .hw-badge.orange {{ background: #7c2d12; color: #fdba74; }}
+            .hw-badge.red    {{ background: #450a0a; color: #fca5a5; }}
+            .section-divider {{
+                font-size: 0.68rem; font-weight: 700; color: #475569; text-transform: uppercase;
+                letter-spacing: 0.08em; width: 100%; padding-top: 0.4rem; margin-top: 0.2rem;
+                border-top: 1px solid #1e293b;
+            }}
+            #hw-warn-dialog {{
+                display: none; position: fixed; inset: 0; z-index: 1000;
+                background: rgba(0,0,0,0.7); align-items: center; justify-content: center;
+            }}
+            #hw-warn-dialog.open {{ display: flex; }}
+            .hw-warn-box {{
+                background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+                padding: 1.4rem 1.6rem; max-width: 560px; width: 90%; max-height: 70vh;
+                overflow-y: auto;
+            }}
+            .hw-warn-box h3 {{ margin: 0 0 0.8rem; font-size: 1rem; color: #f97316; }}
+            .hw-warn-list {{ list-style: none; padding: 0; margin: 0 0 1rem; }}
+            .hw-warn-list li {{
+                font-size: 0.78rem; color: #cbd5e1; padding: 0.35rem 0;
+                border-bottom: 1px solid #0f172a;
+            }}
+            .hw-warn-list li:last-child {{ border-bottom: none; }}
+            .hw-warn-list .req-label {{ font-weight: 700; color: #f97316; margin-right: 0.3rem; }}
+            .hw-warn-list .req-label.partial {{ color: #fbbf24; }}
+            .hw-warn-actions {{ display: flex; gap: 0.7rem; justify-content: flex-end; flex-wrap: wrap; }}
+            .hw-warn-actions .btn {{ font-size: 0.78rem; padding: 0.45rem 0.9rem; }}
 
             /* ── Forms ── */
             .form-grid {{
@@ -1309,13 +1398,20 @@ async def index() -> str:
                         <div class="form-group full">
                             <label>Sections</label>
                             <div style="display:flex;flex-wrap:wrap;gap:0.7rem;margin-top:0.3rem">
-                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.3" checked><span>5.3 VLAN</span></div>
-                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.4" checked><span>5.4 General</span></div>
-                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.5" checked><span>5.5 Address</span></div>
-                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.6" checked><span>5.6 Filter</span></div>
-                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.7" checked><span>5.7 Time</span></div>
-                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.8" checked><span>5.8 QoS</span></div>
-                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.9" checked><span>5.9 Config</span></div>
+                                <div class="section-divider">TC8 v3.0 Conformance Tests</div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.3" checked><span>5.3 VLAN <span class="hw-badge green">PC+DUT</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.4" checked><span>5.4 General <span class="hw-badge yellow">Linux req.</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.5" checked><span>5.5 Address <span class="hw-badge green">PC+DUT</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.6" checked><span>5.6 Filter <span class="hw-badge orange">Tgen needed</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.7" checked><span>5.7 Time Sync <span class="hw-badge red">HW required</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.8" checked><span>5.8 QoS <span class="hw-badge orange">Tgen needed</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="5.9" checked><span>5.9 Config <span class="hw-badge green">PC+DUT</span></span></div>
+                                <div class="section-divider" style="margin-top:0.5rem">Extended Automotive Tests (EXT_*)</div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="ext.tsn"><span>EXT TSN/gPTP <span class="hw-badge red">TSN NIC req.</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="ext.phy"><span>EXT PHY Layer <span class="hw-badge red">HW required</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="ext.mgmt"><span>EXT Mgmt/DoIP <span class="hw-badge orange">Partial</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="ext.oracle"><span>EXT Oracle <span class="hw-badge yellow">Linux req.</span></span></div>
+                                <div class="toggle-row"><input type="checkbox" class="run-section" value="ext.perf"><span>EXT Performance <span class="hw-badge orange">Tgen needed</span></span></div>
                             </div>
                         </div>
                     </div>
@@ -1331,6 +1427,24 @@ async def index() -> str:
                         <div class="progress-text" id="run-progress-text">Waiting…</div>
                     </div>
                     <div id="run-result" class="status-msg"></div>
+                </div>
+            </div>
+
+            <!-- ═══ Hardware Warning Dialog ═══ -->
+            <div id="hw-warn-dialog">
+                <div class="hw-warn-box">
+                    <h3>⚠️ Hardware Requirements Detected</h3>
+                    <p style="font-size:0.8rem;color:#94a3b8;margin:0 0 0.8rem">
+                        The selected sections include tests that require hardware beyond a basic PC+DUT setup.
+                        These tests will be marked <strong>SKIP</strong> or <strong>INFORMATIONAL</strong>
+                        on a standard PC setup. Review the list below before continuing.
+                    </p>
+                    <ul class="hw-warn-list" id="hw-warn-list"></ul>
+                    <div class="hw-warn-actions">
+                        <button class="btn btn-ghost" onclick="closeHwWarn()">Cancel</button>
+                        <button class="btn btn-secondary" onclick="runSkipHw()">Skip HW-Gated Tests</button>
+                        <button class="btn btn-primary" onclick="runAllSections()">Run All (incl. HW-gated)</button>
+                    </div>
                 </div>
             </div>
 
@@ -1618,6 +1732,34 @@ async def index() -> str:
 
         // ── Run Tests ──
         let progressWs = null;
+        let _pendingSections = null;  // sections saved while hw-warn dialog is open
+
+        const HW_REQUIRED_SECTIONS = new Set(['5.7', 'ext.tsn', 'ext.phy']);
+        const HW_PARTIAL_SECTIONS  = new Set(['5.6', '5.8', 'ext.mgmt', 'ext.perf', 'ext.oracle']);
+
+        function closeHwWarn() {{
+            document.getElementById('hw-warn-dialog').classList.remove('open');
+            _pendingSections = null;
+        }}
+
+        function runSkipHw() {{
+            document.getElementById('hw-warn-dialog').classList.remove('open');
+            const hwAll = new Set([...HW_REQUIRED_SECTIONS, ...HW_PARTIAL_SECTIONS]);
+            const filtered = (_pendingSections || []).filter(s => !hwAll.has(s));
+            _pendingSections = null;
+            if (filtered.length === 0) {{
+                alert('No PC-runnable sections remain after filtering hardware-gated sections.');
+                return;
+            }}
+            _doRunTest(filtered);
+        }}
+
+        function runAllSections() {{
+            document.getElementById('hw-warn-dialog').classList.remove('open');
+            const secs = _pendingSections;
+            _pendingSections = null;
+            _doRunTest(secs);
+        }}
 
         async function startTest() {{
             const dutPath = document.getElementById('run-dut-select').value;
@@ -1625,12 +1767,43 @@ async def index() -> str:
 
             const tier = document.getElementById('run-tier').value;
             const sections = Array.from(document.querySelectorAll('.run-section:checked')).map(c => c.value);
-            
-            // Warn if no sections selected (would result in 0 tests)
+
             if (sections.length === 0) {{
-                alert('\u26a0\ufe0f No sections selected! Please check at least one section (5.3-5.9) to run tests.');
+                alert('⚠️ No sections selected! Please check at least one section to run tests.');
                 return;
             }}
+
+            // Show pre-run hardware warning if any gated sections are selected
+            const hasHwRequired = sections.some(s => HW_REQUIRED_SECTIONS.has(s));
+            const hasHwPartial  = sections.some(s => HW_PARTIAL_SECTIONS.has(s));
+            if (hasHwRequired || hasHwPartial) {{
+                _pendingSections = sections;
+                const list = document.getElementById('hw-warn-list');
+                list.innerHTML = '';
+                const items = [];
+                if (sections.includes('5.7'))        items.push(['red', '🔴 SWITCH_TIME_001', 'Requires TSN NIC with hardware timestamps (e.g. Intel i210/i225). Returns SKIP on standard NIC.']);
+                if (sections.includes('5.6'))        items.push(['orange', '🟠 SWITCH_FILT_008', 'Storm control threshold accuracy needs dedicated traffic generator. Basic test runs on PC.']);
+                if (sections.includes('5.8'))        items.push(['orange', '🟠 SWITCH_QOS_*', 'Rate accuracy requires dedicated traffic generator. Priority queuing observable on PC.']);
+                if (sections.includes('ext.tsn'))    items.push(['red', '🔴 EXT_TSN_001–010', 'Require TSN-capable NIC with hardware timestamping. All return SKIP (EXT_TSN_010 returns INFORMATIONAL).']);
+                if (sections.includes('ext.phy'))    items.push(['red', '🔴 EXT_PHY_001,003–008', 'Require media converter or PHY test equipment. EXT_PHY_002 (link flap) runs on any PC.']);
+                if (sections.includes('ext.mgmt'))   items.push(['orange', '🟠 EXT_MGMT_001–002', 'DoIP/UDS feasible on standard NIC but not yet implemented. Returns INFORMATIONAL.']);
+                if (sections.includes('ext.oracle')) items.push(['yellow', '🟡 EXT_ORACLE_001–003', 'Require Linux bridge/Open vSwitch. Return SKIP on Windows.']);
+                if (sections.includes('ext.perf'))   items.push(['orange', '🟠 EXT_PERF_001–005', 'Rate-accurate tests require dedicated traffic generator. EXT_PERF_006 runs on PC.']);
+                items.forEach(([cls, label, detail]) => {{
+                    const li = document.createElement('li');
+                    li.innerHTML = '<span class="req-label ' + (cls !== 'red' ? 'partial' : '') + '">' + label + '</span> ' + detail;
+                    list.appendChild(li);
+                }});
+                document.getElementById('hw-warn-dialog').classList.add('open');
+                return;
+            }}
+
+            _doRunTest(sections);
+        }}
+
+        async function _doRunTest(sections) {{
+            const dutPath = document.getElementById('run-dut-select').value;
+            const tier = document.getElementById('run-tier').value;
 
             document.getElementById('btn-start-test').disabled = true;
             document.getElementById('btn-cancel-test').disabled = false;

@@ -16,9 +16,9 @@ from src.models.test_case import TestSection
 class TestSpecDefinitions:
     """Validate YAML spec definitions integrity."""
 
-    def test_all_71_specs_loaded(self, config_manager: ConfigManager) -> None:
-        """All 71 TC8 specifications must be loaded."""
-        assert len(config_manager.spec_definitions) == 71
+    def test_all_specs_loaded(self, config_manager: ConfigManager) -> None:
+        """All 104 specifications must be loaded (71 TC8 + 33 EXT_*)."""
+        assert len(config_manager.spec_definitions) == 104
 
     def test_spec_ids_unique(self, config_manager: ConfigManager) -> None:
         """Every spec ID must be unique."""

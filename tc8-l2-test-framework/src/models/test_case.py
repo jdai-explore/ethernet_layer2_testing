@@ -61,8 +61,9 @@ class TestStatus(str, enum.Enum):
 
 
 class TestSection(str, enum.Enum):
-    """TC8 Layer 2 specification sections."""
+    """TC8 Layer 2 specification sections and extended automotive test categories."""
 
+    # ── TC8 v3.0 compliance sections (SWITCH_* IDs) ──────────────────
     VLAN = "5.3"
     GENERAL = "5.4"
     ADDRESS_LEARNING = "5.5"
@@ -70,6 +71,13 @@ class TestSection(str, enum.Enum):
     TIME_SYNC = "5.7"
     QOS = "5.8"
     CONFIGURATION = "5.9"
+
+    # ── Extended automotive tests (EXT_* IDs) ────────────────────────
+    EXT_TSN = "ext.tsn"           # TSN / gPTP deeper support (EXT_TSN_NNN)
+    EXT_PHY = "ext.phy"           # Automotive PHY awareness (EXT_PHY_NNN)
+    EXT_MGMT = "ext.mgmt"         # DUT management channel (EXT_MGMT_NNN)
+    EXT_ORACLE = "ext.oracle"     # Golden device / virtual oracle (EXT_ORACLE_NNN)
+    EXT_PERF = "ext.perf"         # Performance / traffic generation (EXT_PERF_NNN)
 
 
 class TimingTier(str, enum.Enum):
@@ -87,6 +95,41 @@ class InterfaceType(str, enum.Enum):
     RAW_SOCKET = "raw_socket"
     TCP = "tcp"
     USB = "usb"
+
+
+class SetupRequirement(str, enum.Enum):
+    """
+    Minimum test station setup needed to run a spec meaningfully.
+
+    Used to badge specs in the UI and warn users before running tests
+    that will always produce SKIP/INFORMATIONAL on a basic PC+DUT setup.
+    """
+
+    PC_ONLY = "pc_only"
+    # Standard NIC + DUT is sufficient. Runnable on any setup.
+
+    LINUX_RAW_SOCKET = "linux_raw"
+    # Requires Linux AF_PACKET raw socket. Not available on Windows/Npcap.
+
+    TRAFFIC_GENERATOR = "tgen"
+    # Dedicated traffic generator needed for accurate rate/burst tests.
+    # Basic burst with Scapy is possible but results are not reliable.
+
+    PHYSICAL_MANIPULATION = "physical"
+    # Requires physical cable insertion/removal or controlled power cycling.
+
+    DUT_RESET = "dut_reset"
+    # Requires a controlled DUT reset mechanism (can_reset=true in profile).
+
+    TSN_NIC = "tsn_nic"
+    # Requires a hardware-timestamping NIC (e.g., Intel i210/i225).
+    # Standard PC NICs give ±1 ms — meaningless for gPTP / TSN tests.
+
+    MEDIA_CONVERTER = "media_converter"
+    # Requires a 100BASE-T1 / 1000BASE-T1 media converter or T1-capable NIC.
+
+    SPECIALIZED_HW = "specialized_hw"
+    # Requires custom or proprietary test equipment.
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +212,16 @@ class TestSpecDefinition(BaseModel):
     )
     applicable_tpids: list[int] = Field(
         default_factory=lambda: [0x8100, 0x88A8, 0x9100]
+    )
+
+    # ── Hardware / setup requirements ─────────────────────────────────
+    setup_requirement: SetupRequirement = Field(
+        default=SetupRequirement.PC_ONLY,
+        description="Minimum test station setup needed to run this spec meaningfully",
+    )
+    hardware_requirement_detail: str = Field(
+        default="",
+        description="Human-readable explanation of what hardware is needed and why",
     )
 
 

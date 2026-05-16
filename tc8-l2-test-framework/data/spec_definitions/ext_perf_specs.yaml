@@ -1,0 +1,179 @@
+---
+# Extended Performance / Traffic Generation Test Specifications
+# Section: EXT_PERF — Rate, burst, latency, and throughput tests
+# Spec ID format: EXT_PERF_NNN
+# Note: Basic burst tests are feasible on PC+DUT. Precise rate/latency tests
+#       require a dedicated traffic generator (Ixia, Spirent, or similar).
+
+EXT_PERF_001:
+  tc8_reference: "ext.perf"
+  title: "Sustained 100 Mbps Line Rate Forwarding"
+  description: >
+    Verify that the DUT can sustain 100 Mbps wire-speed forwarding without
+    frame loss for a minimum of 10 seconds. Basic burst with Scapy is possible
+    but Scapy cannot sustain true 100 Mbps — results at that rate require
+    a dedicated traffic generator.
+  priority: high
+  timing_tier: tier_b
+  setup_requirement: traffic_generator
+  hardware_requirement_detail: >
+    Scapy on a standard PC can typically achieve 10–30 Mbps burst, not true
+    100 Mbps line rate. For wire-speed test, use a dedicated traffic generator
+    (Ixia IxNetwork, Spirent TestCenter, or an FPGA-based solution).
+    Basic functional test at lower rates is possible with Scapy.
+  parameters:
+    target_rate_mbps: 100
+    duration_s: 10
+    max_loss_frames: 0
+  preconditions:
+    - "Traffic generator capable of 100 Mbps line rate"
+    - "DUT port connected"
+  test_procedure:
+    - "Configure traffic generator for 100 Mbps unidirectional traffic"
+    - "Run for 10 s"
+    - "Measure frame loss"
+    - "Verify zero frame loss"
+  expected_result:
+    frame_loss: 0
+    sustained_rate_mbps: 100
+
+EXT_PERF_002:
+  tc8_reference: "ext.perf"
+  title: "Broadcast Storm Control Threshold"
+  description: >
+    Verify that the DUT's broadcast storm control activates at the configured
+    threshold (default 10% of line rate = 10 Mbps) and drops excess broadcast
+    frames. Below threshold, all frames must be forwarded. Above threshold,
+    DUT must suppress excess. Basic Scapy burst can test activation; accurate
+    threshold measurement requires a traffic generator.
+  priority: high
+  timing_tier: tier_b
+  setup_requirement: traffic_generator
+  hardware_requirement_detail: >
+    Accurate threshold measurement (±1 Mbps) requires a traffic generator.
+    Scapy burst can demonstrate that storm control activates but cannot precisely
+    characterize the threshold boundary due to rate variability (±30%).
+  parameters:
+    storm_threshold_percent: 10
+    line_rate_mbps: 100
+  preconditions:
+    - "Storm control configured on DUT at 10% threshold"
+    - "Traffic generator for accurate rate steps"
+  test_procedure:
+    - "Send broadcast at 5% line rate — verify all forwarded"
+    - "Send broadcast at 15% line rate — verify storm control activates"
+    - "Measure actual suppression rate"
+  expected_result:
+    below_threshold_forwarded: true
+    above_threshold_rate_limited: true
+
+EXT_PERF_003:
+  tc8_reference: "ext.perf"
+  title: "Minimum Inter-Frame Gap Compliance"
+  description: >
+    Verify that the DUT preserves IEEE 802.3 minimum inter-frame gap (IFG)
+    of 96 bit-times (9.6 µs at 100 Mbps) on all forwarded frames.
+    Requires a traffic analyzer with sub-microsecond timestamp resolution.
+  priority: medium
+  timing_tier: tier_c
+  setup_requirement: traffic_generator
+  hardware_requirement_detail: >
+    Requires a dedicated traffic analyzer with hardware timestamps (sub-µs resolution)
+    to accurately measure IFG. Standard NIC timestamps have ±1 ms noise —
+    10,000× the 9.6 µs IFG. Not measurable with standard PC NIC.
+  parameters:
+    min_ifg_ns: 960
+  preconditions:
+    - "Traffic analyzer with hardware timestamps"
+    - "DUT forwarding at line rate"
+  test_procedure:
+    - "Send back-to-back frames at minimum IFG"
+    - "Capture forwarded frames with hardware timestamps"
+    - "Measure inter-frame gaps on forwarded traffic"
+    - "Verify no IFG violation (< 960 ns)"
+  expected_result:
+    ifg_compliant: true
+    min_ifg_ns: 960
+
+EXT_PERF_004:
+  tc8_reference: "ext.perf"
+  title: "Maximum Throughput (RFC 2544)"
+  description: >
+    Measure maximum throughput using RFC 2544 binary search methodology.
+    Find the highest frame rate at which the DUT forwards with zero frame loss.
+    Follows the RFC 2544 test procedure with frame sizes 64, 128, 256, 512,
+    1024, 1280, 1518 bytes.
+  priority: high
+  timing_tier: tier_b
+  setup_requirement: traffic_generator
+  hardware_requirement_detail: >
+    RFC 2544 requires a bidirectional traffic generator capable of precise rate
+    control and frame loss measurement. Ixia IxNetwork, Spirent TestCenter,
+    or open-source DPDK-based tools on a server-class NIC are suitable.
+    Standard PC Scapy cannot achieve the precision needed for RFC 2544.
+  parameters:
+    frame_sizes: [64, 128, 256, 512, 1024, 1280, 1518]
+    trial_duration_s: 60
+  preconditions:
+    - "RFC 2544 capable traffic generator"
+    - "DUT port connected"
+  test_procedure:
+    - "For each frame size: binary search for max zero-loss rate"
+    - "Run at found rate for 60 s"
+    - "Verify zero frame loss at max throughput"
+  expected_result:
+    zero_loss_throughput_found: true
+
+EXT_PERF_005:
+  tc8_reference: "ext.perf"
+  title: "Latency Under Load (RFC 2544)"
+  description: >
+    Measure round-trip frame latency at different traffic loads (10%, 50%, 100%
+    of max throughput). Latency should not increase disproportionately under load
+    on an automotive-grade switch.
+  priority: medium
+  timing_tier: tier_b
+  setup_requirement: traffic_generator
+  hardware_requirement_detail: >
+    Requires a traffic generator with hardware timestamp support for accurate
+    latency measurement. Standard PC NIC timestamps have ±1 ms noise —
+    adequate only for latency > 10 ms. Automotive switches typically have
+    < 100 µs latency, which requires hardware-timestamping test equipment.
+  parameters:
+    loads_percent: [10, 50, 100]
+    max_latency_us: 100
+  preconditions:
+    - "Traffic generator with hardware timestamp support"
+  test_procedure:
+    - "For each load level: send traffic at target rate"
+    - "Measure latency at each load"
+    - "Verify latency < 100 µs at all load levels"
+  expected_result:
+    latency_within_spec: true
+
+EXT_PERF_006:
+  tc8_reference: "ext.perf"
+  title: "Multicast Replication Load Test"
+  description: >
+    Verify that the DUT can replicate multicast frames to multiple ports
+    simultaneously without frame loss at moderate load (10 Mbps multicast
+    to 4 ports). Basic burst test is feasible with Scapy at moderate rates.
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: pc_only
+  hardware_requirement_detail: ""
+  parameters:
+    multicast_rate_mbps: 10
+    replication_ports: 4
+    duration_s: 5
+  preconditions:
+    - "DUT with multicast forwarding configured"
+    - "4 egress ports connected to test station"
+  test_procedure:
+    - "Send multicast frames at 10 Mbps for 5 s"
+    - "Capture on all 4 egress ports"
+    - "Verify all ports receive all frames"
+    - "Count frame loss per port"
+  expected_result:
+    all_ports_receive: true
+    max_loss_percent: 1.0

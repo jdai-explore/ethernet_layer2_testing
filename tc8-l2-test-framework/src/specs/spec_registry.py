@@ -29,6 +29,11 @@ def _build_registry() -> dict[TestSection, type[BaseTestSpec]]:
     from src.specs.time_tests import TimeTests
     from src.specs.qos_tests import QoSTests
     from src.specs.config_tests import ConfigTests
+    from src.specs.ext_tsn_tests import ExtTsnTests
+    from src.specs.ext_phy_tests import ExtPhyTests
+    from src.specs.ext_mgmt_tests import ExtMgmtTests
+    from src.specs.ext_oracle_tests import ExtOracleTests
+    from src.specs.ext_perf_tests import ExtPerfTests
 
     return {
         TestSection.GENERAL: GeneralTests,
@@ -38,6 +43,11 @@ def _build_registry() -> dict[TestSection, type[BaseTestSpec]]:
         TestSection.TIME_SYNC: TimeTests,
         TestSection.QOS: QoSTests,
         TestSection.CONFIGURATION: ConfigTests,
+        TestSection.EXT_TSN: ExtTsnTests,
+        TestSection.EXT_PHY: ExtPhyTests,
+        TestSection.EXT_MGMT: ExtMgmtTests,
+        TestSection.EXT_ORACLE: ExtOracleTests,
+        TestSection.EXT_PERF: ExtPerfTests,
     }
 
 

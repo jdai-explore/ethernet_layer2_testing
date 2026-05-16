@@ -91,8 +91,8 @@ class TestConfigValidation:
             pass  # Expected — validation should reject
 
     def test_config_manager_loads_specs(self, config_manager: ConfigManager) -> None:
-        """ConfigManager should load spec definitions."""
-        assert len(config_manager.spec_definitions) == 71
+        """ConfigManager should load all spec definitions (71 TC8 + 33 EXT_*)."""
+        assert len(config_manager.spec_definitions) == 104
 
 
 class TestSpecRegistryCompleteness:
@@ -101,7 +101,7 @@ class TestSpecRegistryCompleteness:
     def test_all_sections_registered(
         self, config_manager: ConfigManager, validator: ResultValidator
     ) -> None:
-        """SpecRegistry should cover all 7 TC8 sections."""
+        """SpecRegistry should cover all 7 TC8 sections plus 5 EXT_* sections."""
         registry = SpecRegistry(config_manager, validator)
         for section in TestSection:
             assert registry.has_handler(section), (
@@ -111,8 +111,9 @@ class TestSpecRegistryCompleteness:
     def test_supported_sections_count(
         self, config_manager: ConfigManager, validator: ResultValidator
     ) -> None:
+        """12 sections total: 7 TC8 (5.3–5.9) + 5 EXT_* extended sections."""
         registry = SpecRegistry(config_manager, validator)
-        assert len(registry.supported_sections) == 7
+        assert len(registry.supported_sections) == 12
 
 
 class TestReportGeneratorRendering:

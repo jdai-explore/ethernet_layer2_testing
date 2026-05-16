@@ -1,0 +1,103 @@
+---
+# Extended Golden Device / Virtual Oracle Test Specifications
+# Section: EXT_ORACLE — Validate the DUT against a known-good reference
+# Spec ID format: EXT_ORACLE_NNN
+
+EXT_ORACLE_001:
+  tc8_reference: "ext.oracle"
+  title: "Virtual Switch Known-Good Forwarding Baseline"
+  description: >
+    Configure a Linux software bridge (or Open vSwitch) identically to the DUT
+    and verify it forwards frames correctly for a reference set of test cases.
+    This establishes the oracle baseline — the ground truth against which the
+    DUT will be compared. Fully runnable on a Linux PC with no additional hardware.
+  priority: high
+  timing_tier: tier_a
+  setup_requirement: pc_only
+  hardware_requirement_detail: ""
+  parameters: {}
+  preconditions:
+    - "Linux host with bridge-utils or Open vSwitch installed"
+    - "Virtual interfaces configured to mirror DUT topology"
+  test_procedure:
+    - "Create Linux bridge with VLAN configuration matching DUT profile"
+    - "Send reference frame set through virtual bridge"
+    - "Record expected per-port forwarding behavior"
+    - "Store as oracle baseline"
+  expected_result:
+    oracle_baseline_established: true
+
+EXT_ORACLE_002:
+  tc8_reference: "ext.oracle"
+  title: "Virtual Switch Known-Bad Frame Drop Verification"
+  description: >
+    Send frames that should be dropped according to TC8 rules (wrong VLAN,
+    illegal source MAC, reserved VID) through the virtual oracle switch and
+    verify they are correctly dropped. Establishes the negative-test baseline.
+  priority: high
+  timing_tier: tier_a
+  setup_requirement: pc_only
+  hardware_requirement_detail: ""
+  parameters: {}
+  preconditions:
+    - "Linux bridge or Open vSwitch with VLAN filtering enabled"
+  test_procedure:
+    - "Send frame with src_mac = broadcast (ff:ff:ff:ff:ff:ff) — expect drop"
+    - "Send frame with VID not in VLAN membership — expect drop"
+    - "Send frame with reserved VID 4095 — expect drop"
+    - "Verify oracle drops all negative-test frames"
+  expected_result:
+    illegal_frames_dropped: true
+
+EXT_ORACLE_003:
+  tc8_reference: "ext.oracle"
+  title: "DUT vs Virtual Oracle Behavioral Diff"
+  description: >
+    Run the same reference frame set through both the DUT and the virtual oracle,
+    then compare per-port forwarding behavior. Any difference between DUT output
+    and oracle output is reported as a behavioral divergence, not a simple PASS/FAIL.
+    Requires Linux host for oracle (can be same PC running the test framework).
+  priority: high
+  timing_tier: tier_a
+  setup_requirement: pc_only
+  hardware_requirement_detail: ""
+  parameters:
+    tolerance_ms: 100.0
+  preconditions:
+    - "Virtual oracle baseline established (EXT_ORACLE_001)"
+    - "DUT connected with matching profile"
+  test_procedure:
+    - "Run reference frame set against virtual oracle — record expected output"
+    - "Run same frame set against DUT — record actual output"
+    - "Diff oracle output vs DUT output per test case"
+    - "Report divergences with oracle-expected vs DUT-actual detail"
+  expected_result:
+    behavioral_diff_empty: true
+
+EXT_ORACLE_004:
+  tc8_reference: "ext.oracle"
+  title: "Hardware Golden Device Comparison"
+  description: >
+    Run the full TC8 test suite against both the DUT under test and a known-good
+    hardware reference ECU (golden device). Compare result sets. Any spec that
+    passes on the golden device but fails on the DUT indicates a DUT regression.
+    Requires a second known-good ECU as the hardware oracle.
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: specialized_hw
+  hardware_requirement_detail: >
+    Requires a second ECU of the same type that is known to pass TC8 compliance
+    (the "golden device"). Both DUT and golden device must be connected to the
+    test station simultaneously, or the test must be run sequentially with
+    identical test parameters. Not available without a second validated ECU.
+  parameters: {}
+  preconditions:
+    - "Golden device (known-good ECU) available and connected"
+    - "Golden device and DUT have identical VLAN/port configuration"
+  test_procedure:
+    - "Run smoke tier against golden device — record as oracle results"
+    - "Run smoke tier against DUT — record DUT results"
+    - "Compare: specs PASS on golden but FAIL on DUT = regression"
+    - "Compare: specs PASS on DUT but FAIL on golden = DUT improvement or false pass"
+  expected_result:
+    no_regressions_vs_golden: true

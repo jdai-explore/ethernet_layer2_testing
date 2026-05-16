@@ -1,0 +1,130 @@
+---
+# Extended DUT Management Channel Test Specifications
+# Section: EXT_MGMT — DUT management via DoIP/UDS, SSH, AUTOSAR, or vendor API
+# Spec ID format: EXT_MGMT_NNN
+
+EXT_MGMT_001:
+  tc8_reference: "ext.mgmt"
+  title: "DoIP ECU Reset via UDS Service 0x11"
+  description: >
+    Send a UDS ECUReset request (service 0x11 sub-function 0x01) over DoIP
+    to trigger a hard reset of the DUT. Verify that the DUT resets and the
+    Ethernet switch is operational again within the defined startup time.
+    Requires DoIP stack accessible over standard Ethernet NIC.
+  priority: high
+  timing_tier: tier_a
+  setup_requirement: pc_only
+  hardware_requirement_detail: ""
+  parameters:
+    reset_timeout_s: 10.0
+    doip_port: 13400
+  preconditions:
+    - "DUT exposes DoIP server on standard Ethernet port"
+    - "UDS ECUReset (0x11 0x01) supported by DUT"
+  test_procedure:
+    - "Establish DoIP connection to DUT"
+    - "Send UDS ECUReset request (0x27 0x01 0x11 0x01)"
+    - "Wait for ECU to come back online (max 10 s)"
+    - "Verify basic frame forwarding resumes"
+  expected_result:
+    reset_successful: true
+    startup_time_s: 10.0
+
+EXT_MGMT_002:
+  tc8_reference: "ext.mgmt"
+  title: "UDS Configuration Readback via DoIP"
+  description: >
+    Read DUT switch configuration (VLAN table, port states, MAC table entries)
+    via UDS ReadDataByIdentifier (0x22) over DoIP. Verify that the reported
+    configuration matches the expected DUT profile.
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: pc_only
+  hardware_requirement_detail: ""
+  parameters:
+    doip_port: 13400
+  preconditions:
+    - "DUT exposes DoIP server"
+    - "UDS ReadDataByIdentifier (0x22) supported"
+    - "DUT profile configured before test"
+  test_procedure:
+    - "Establish DoIP connection"
+    - "Send UDS 0x22 with DID for VLAN table"
+    - "Parse response and compare to expected profile"
+  expected_result:
+    config_matches_profile: true
+
+EXT_MGMT_003:
+  tc8_reference: "ext.mgmt"
+  title: "AUTOSAR PDU Router Configuration Verification"
+  description: >
+    Verify that the AUTOSAR PDU Router (PduR) on the DUT is configured
+    to route PDUs to the correct destination modules according to the
+    integration manifest. Requires AUTOSAR testability interface (SOVD or XCP).
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: specialized_hw
+  hardware_requirement_detail: >
+    Requires AUTOSAR testability interface (SOVD — Service-Oriented Vehicle
+    Diagnostics, or XCP over Ethernet). AUTOSAR stack and integration manifest
+    access required. Not available without ECU AUTOSAR integration.
+  parameters: {}
+  preconditions:
+    - "DUT running AUTOSAR runtime"
+    - "SOVD or XCP over Ethernet accessible"
+  test_procedure:
+    - "Connect via SOVD/XCP"
+    - "Read PduR routing table from DUT"
+    - "Verify routing matches integration manifest"
+  expected_result:
+    routing_matches_manifest: true
+
+EXT_MGMT_004:
+  tc8_reference: "ext.mgmt"
+  title: "SSH / Serial Configuration Verification"
+  description: >
+    Connect to DUT via SSH or serial console and read switch configuration
+    commands (e.g., VLAN table dump, MAC table show). Verify output matches
+    the expected DUT profile. Requires ECU to expose SSH/serial management.
+  priority: low
+  timing_tier: tier_a
+  setup_requirement: specialized_hw
+  hardware_requirement_detail: >
+    Requires SSH access to the DUT (Linux-based ECUs with sshd) or a serial
+    console cable. Not available on all ECUs. ECU-dependent configuration.
+  parameters:
+    ssh_timeout_s: 5.0
+  preconditions:
+    - "DUT exposes SSH or serial console"
+    - "Credentials or key-based auth configured"
+  test_procedure:
+    - "Connect via SSH or serial"
+    - "Execute VLAN/MAC table show commands"
+    - "Parse output and compare to DUT profile"
+  expected_result:
+    config_matches_profile: true
+
+EXT_MGMT_005:
+  tc8_reference: "ext.mgmt"
+  title: "Vendor API Switch State Readback"
+  description: >
+    Use a vendor-specific management API (REST, NETCONF, SNMP, or proprietary)
+    to read the DUT's switch state (port link status, VLAN assignments, MAC
+    table, error counters). Verify state matches expected values.
+  priority: low
+  timing_tier: tier_a
+  setup_requirement: specialized_hw
+  hardware_requirement_detail: >
+    Requires vendor-specific management software or protocol stack.
+    NETCONF requires DUT to support RFC 6241. SNMP requires DUT MIBs.
+    Availability and implementation are ECU-dependent.
+  parameters: {}
+  preconditions:
+    - "Vendor management API accessible"
+    - "DUT configured and running"
+  test_procedure:
+    - "Connect via vendor API"
+    - "Read port states, VLAN table, MAC table"
+    - "Verify all values match DUT profile expectations"
+  expected_result:
+    state_matches_profile: true

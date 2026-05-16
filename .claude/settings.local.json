@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(del \"Z:\\\\layer2_Ethernet_Testing\\\\ethernet_layer2_testing\\\\tc8-l2-test-framework\\\\test_output.txt\")"
+      "Bash(del \"Z:\\\\layer2_Ethernet_Testing\\\\ethernet_layer2_testing\\\\tc8-l2-test-framework\\\\test_output.txt\")",
+      "Bash(Select-String -Path \"Z:\\\\layer2_Ethernet_Testing\\\\ethernet_layer2_testing\\\\tc8-l2-test-framework\\\\web\\\\backend\\\\main.py\" -Pattern \"Run Tests\")",
+      "Bash(Select-Object -First 5)",
+      "Bash(python -c ' *)",
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(python -m pytest tests/ -q)"
     ]
   }
 }

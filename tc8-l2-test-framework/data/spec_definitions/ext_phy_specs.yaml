@@ -1,0 +1,209 @@
+---
+# Extended Automotive PHY Test Specifications
+# Section: EXT_PHY — Automotive PHY awareness (100BASE-T1, 1000BASE-T1, 10BASE-T1S)
+# Spec ID format: EXT_PHY_NNN
+
+EXT_PHY_001:
+  tc8_reference: "ext.phy"
+  title: "Link Up Detection — 100BASE-T1"
+  description: >
+    Verify that the DUT's 100BASE-T1 port establishes a link within the
+    specified time after cable connection. Requires a media converter to
+    bridge standard RJ45 test station NIC to 100BASE-T1 (BroadR-Reach).
+  priority: high
+  timing_tier: tier_a
+  setup_requirement: media_converter
+  hardware_requirement_detail: >
+    Requires a 100BASE-T1 media converter (e.g., Technica Engineering, Intrepid)
+    or a 100BASE-T1-capable NIC (e.g., NXP LS1028A, Marvell 88Q2110 eval board).
+    Standard RJ45 NICs cannot communicate directly with 100BASE-T1 ports.
+  parameters:
+    link_up_timeout_s: 3.0
+  preconditions:
+    - "100BASE-T1 media converter connected between test station NIC and DUT"
+  test_procedure:
+    - "Disconnect cable from DUT port"
+    - "Reconnect cable — start timer"
+    - "Verify link UP (psutil / ethtool) within 3 s"
+  expected_result:
+    link_up: true
+    link_up_timeout_s: 3.0
+
+EXT_PHY_002:
+  tc8_reference: "ext.phy"
+  title: "Link Flap Count Monitoring"
+  description: >
+    Monitor a DUT port for unintended link flap events over a 60-second
+    observation window. An automotive-grade port should show zero flaps
+    under steady-state conditions. Uses OS-level interface statistics (psutil).
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: pc_only
+  hardware_requirement_detail: ""
+  parameters:
+    observation_window_s: 60
+    max_allowed_flaps: 0
+  preconditions:
+    - "DUT port connected and link UP"
+    - "No intentional cable manipulation during test"
+  test_procedure:
+    - "Record initial interface statistics via psutil"
+    - "Wait 60 s"
+    - "Check link flap counters via psutil or ethtool"
+    - "Verify no unintended flaps occurred"
+  expected_result:
+    flap_count: 0
+
+EXT_PHY_003:
+  tc8_reference: "ext.phy"
+  title: "PHY Symbol Error Rate"
+  description: >
+    Measure the bit error rate (BER) or symbol error rate at the PHY layer.
+    An automotive-grade PHY should achieve BER < 1e-10 under normal operating
+    conditions. Requires PHY register access via MDIO or vendor management API.
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: specialized_hw
+  hardware_requirement_detail: >
+    Requires access to PHY management registers (MDIO bus, SPI, or vendor API)
+    to read error counters. Also requires a controlled signal quality environment
+    or a bit-error-rate tester (BERT). Not accessible via standard Ethernet NIC.
+  parameters:
+    max_ber: 1.0e-10
+    measurement_window_s: 60
+  preconditions:
+    - "MDIO or vendor PHY management API accessible"
+    - "Controlled RF/EMC environment"
+  test_procedure:
+    - "Read PHY error counters at t=0"
+    - "Wait 60 s with active traffic"
+    - "Read PHY error counters at t=60"
+    - "Compute BER from counter delta and bit count"
+  expected_result:
+    ber_within_spec: true
+
+EXT_PHY_004:
+  tc8_reference: "ext.phy"
+  title: "Media Converter Transparent Frame Forwarding"
+  description: >
+    Verify that a 100BASE-T1 media converter faithfully forwards Ethernet frames
+    without modification. Frame payload, VLAN tags, and MAC addresses must be
+    preserved end-to-end through the converter.
+  priority: high
+  timing_tier: tier_a
+  setup_requirement: media_converter
+  hardware_requirement_detail: >
+    Requires a 100BASE-T1 media converter. Tests the converter itself as a
+    pass-through device before running DUT tests through it.
+  parameters: {}
+  preconditions:
+    - "Media converter connected between test NIC and DUT"
+    - "Both ends link UP"
+  test_procedure:
+    - "Send tagged Ethernet frame through media converter"
+    - "Capture on DUT side"
+    - "Verify frame is bit-identical (payload, VLAN tag, MACs)"
+  expected_result:
+    frame_identical: true
+
+EXT_PHY_005:
+  tc8_reference: "ext.phy"
+  title: "1000BASE-T1 Link Establishment"
+  description: >
+    Verify that a 1000BASE-T1 (Multi-Gig T1) port establishes a Gigabit
+    link within the specified timeout. Requires 1000BASE-T1 media converter
+    or compatible NIC.
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: media_converter
+  hardware_requirement_detail: >
+    Requires a 1000BASE-T1 media converter (e.g., Technica Engineering 1000T1
+    converter) or a 1000BASE-T1-capable NIC. Much less commonly available than
+    100BASE-T1 converters.
+  parameters:
+    link_up_timeout_s: 5.0
+  preconditions:
+    - "1000BASE-T1 media converter connected"
+  test_procedure:
+    - "Connect cable to DUT 1000BASE-T1 port — start timer"
+    - "Verify link UP at 1000 Mbps within 5 s"
+  expected_result:
+    link_up: true
+    speed_mbps: 1000
+
+EXT_PHY_006:
+  tc8_reference: "ext.phy"
+  title: "Mixed-Speed Port Forwarding (100BASE-T1 and 1000BASE-T1)"
+  description: >
+    Verify frame forwarding between a 100BASE-T1 port and a 1000BASE-T1 port
+    on the same DUT. Tests the switch's speed adaptation and buffering.
+  priority: medium
+  timing_tier: tier_a
+  setup_requirement: media_converter
+  hardware_requirement_detail: >
+    Requires media converters for both 100BASE-T1 and 1000BASE-T1 ports,
+    or a multi-speed T1-capable NIC.
+  parameters: {}
+  preconditions:
+    - "100BASE-T1 converter on port A, 1000BASE-T1 converter on port B"
+    - "Both ports link UP"
+  test_procedure:
+    - "Send frame from 100BASE-T1 port to 1000BASE-T1 port"
+    - "Verify frame received correctly"
+    - "Send in reverse direction"
+    - "Verify frame received correctly"
+  expected_result:
+    forward_to_ports: []
+    bidirectional: true
+
+EXT_PHY_007:
+  tc8_reference: "ext.phy"
+  title: "PHY Internal Loopback Mode"
+  description: >
+    Configure DUT PHY into internal loopback mode and verify that all
+    transmitted frames are looped back correctly. Used to isolate PHY
+    hardware faults from network-level issues.
+  priority: low
+  timing_tier: tier_a
+  setup_requirement: specialized_hw
+  hardware_requirement_detail: >
+    Requires access to PHY management registers to enable loopback mode
+    (MDIO register 0 bit 14, or vendor-specific). Not accessible via
+    standard Ethernet NIC driver.
+  parameters: {}
+  preconditions:
+    - "MDIO or vendor PHY management API accessible"
+  test_procedure:
+    - "Enable PHY internal loopback via MDIO register"
+    - "Send test frames from test station"
+    - "Verify frames loop back correctly"
+    - "Disable loopback"
+  expected_result:
+    loopback_successful: true
+
+EXT_PHY_008:
+  tc8_reference: "ext.phy"
+  title: "10BASE-T1S Segment Behavior"
+  description: >
+    Verify basic frame forwarding on a 10BASE-T1S multidrop segment.
+    10BASE-T1S uses a shared medium with PLCA (Physical Layer Collision Avoidance)
+    which requires specialized hardware support.
+  priority: low
+  timing_tier: tier_a
+  setup_requirement: specialized_hw
+  hardware_requirement_detail: >
+    Requires 10BASE-T1S-capable NIC or evaluation board (e.g., Microchip LAN8650/1
+    or ADIN1110). Standard NICs do not support 10BASE-T1S multidrop operation.
+    Very rare in current test setups — only relevant for zone ECU / in-vehicle
+    sensor applications.
+  parameters: {}
+  preconditions:
+    - "10BASE-T1S capable NIC and DUT"
+    - "PLCA configured consistently across all nodes"
+  test_procedure:
+    - "Verify PLCA beacon reception"
+    - "Send frame from test station to DUT"
+    - "Verify DUT receives frame on shared segment"
+  expected_result:
+    plca_operational: true
+    frame_received: true
