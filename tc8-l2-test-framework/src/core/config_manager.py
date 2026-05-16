@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG_DIR = _PROJECT_ROOT / "config"
 DATA_DIR = _PROJECT_ROOT / "data"
-SPEC_DEFINITIONS_DIR = DATA_DIR / "spec_definitions"
+SPEC_TC8_DIR = DATA_DIR / "tc8"
+SPEC_EXT_DIR = DATA_DIR / "ext"
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +103,7 @@ class ConfigManager:
     ) -> None:
         self.config_dir = config_dir or CONFIG_DIR
         self.data_dir = data_dir or DATA_DIR
-        self.spec_dir = self.data_dir / "spec_definitions"
+        self.spec_dirs = [self.data_dir / "tc8", self.data_dir / "ext"]
 
         self._defaults: DefaultConfig | None = None
         self._tiers: TierDefinitions | None = None
@@ -197,13 +198,17 @@ class ConfigManager:
     # ── Spec Definitions ──────────────────────────────────────────────
 
     def load_spec_definitions(self) -> dict[str, TestSpecDefinition]:
-        """Load all TC8 spec definitions from YAML files in spec_definitions/."""
+        """Load all spec definitions from data/tc8/ and data/ext/."""
         self._spec_definitions.clear()
-        if not self.spec_dir.exists():
-            logger.warning("Spec definitions directory not found: %s", self.spec_dir)
+        yaml_files = sorted(
+            f for d in self.spec_dirs if d.exists()
+            for f in d.glob("*.yaml")
+        )
+        if not yaml_files:
+            logger.warning("No spec definition YAML files found in %s", self.spec_dirs)
             return self._spec_definitions
 
-        for yaml_file in sorted(self.spec_dir.glob("*.yaml")):
+        for yaml_file in yaml_files:
             # Use safe_load_all to handle multi-document YAML (--- separators)
             raw: dict[str, Any] = {}
             with open(yaml_file, "r", encoding="utf-8") as fh:
@@ -262,7 +267,7 @@ class ConfigManager:
                     **{k: v for k, v in spec_data.items() if k not in ("timing_tier", "setup_requirement")},
                 )
 
-        logger.info("Loaded %d spec definitions from %s", len(self._spec_definitions), self.spec_dir)
+        logger.info("Loaded %d spec definitions from %s", len(self._spec_definitions), self.spec_dirs)
         return self._spec_definitions
 
 

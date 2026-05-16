@@ -22,18 +22,18 @@ logger = logging.getLogger(__name__)
 
 def _build_registry() -> dict[TestSection, type[BaseTestSpec]]:
     """Build the section → spec class mapping."""
-    from src.specs.general_tests import GeneralTests
-    from src.specs.vlan_tests import VLANTests
-    from src.specs.address_tests import AddressTests
-    from src.specs.filtering_tests import FilteringTests
-    from src.specs.time_tests import TimeTests
-    from src.specs.qos_tests import QoSTests
-    from src.specs.config_tests import ConfigTests
-    from src.specs.ext_tsn_tests import ExtTsnTests
-    from src.specs.ext_phy_tests import ExtPhyTests
-    from src.specs.ext_mgmt_tests import ExtMgmtTests
-    from src.specs.ext_oracle_tests import ExtOracleTests
-    from src.specs.ext_perf_tests import ExtPerfTests
+    from src.specs.tc8.general_tests import GeneralTests
+    from src.specs.tc8.vlan_tests import VLANTests
+    from src.specs.tc8.address_tests import AddressTests
+    from src.specs.tc8.filtering_tests import FilteringTests
+    from src.specs.tc8.time_tests import TimeTests
+    from src.specs.tc8.qos_tests import QoSTests
+    from src.specs.tc8.config_tests import ConfigTests
+    from src.specs.ext.ext_tsn_tests import ExtTsnTests
+    from src.specs.ext.ext_phy_tests import ExtPhyTests
+    from src.specs.ext.ext_mgmt_tests import ExtMgmtTests
+    from src.specs.ext.ext_oracle_tests import ExtOracleTests
+    from src.specs.ext.ext_perf_tests import ExtPerfTests
 
     return {
         TestSection.GENERAL: GeneralTests,
