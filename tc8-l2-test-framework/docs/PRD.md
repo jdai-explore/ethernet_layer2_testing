@@ -622,61 +622,9 @@ tiers:
 
 ---
 
-## 8. Implementation Plan & Timeline
+## 8. Quality & Validation Strategy
 
-### 8.1 Development Phases
-
-```mermaid
-gantt
-    title TC8-L2 Test Framework Development
-    dateFormat YYYY-MM-DD
-    
-    section Phase 1: Foundation
-    Project setup, CI/CD              :p1a, 2026-02-17, 3d
-    Core framework (runner, config)   :p1b, after p1a, 4d
-    Frame builder, DUT interface      :p1c, after p1a, 4d
-    Web UI scaffold                   :p1d, after p1b, 3d
-    
-    section Phase 2: Test Suites (Priority)
-    5.4 General (10 specs)            :p2a, after p1d, 3d
-    5.5 Address Learning (21 specs)   :p2b, after p2a, 5d
-    5.3 VLAN Testing (21 specs)       :p2c, after p2b, 5d
-    
-    section Phase 3: Test Suites (Extended)
-    5.6 Filtering (11 specs)          :p3a, after p2c, 3d
-    5.8 QoS (4 specs)                 :p3b, after p3a, 2d
-    5.9 Configuration (3 specs)       :p3c, after p3b, 1d
-    5.7 Time Sync (1 spec)            :p3d, after p3c, 1d
-    
-    section Phase 4: Polish
-    Integration testing               :p4a, after p3d, 3d
-    Documentation                     :p4b, after p4a, 2d
-    Self-validation suite             :p4c, after p4a, 2d
-    
-    section Phase 5: Web Enhancements
-    Topology diagram & wiring view    :p5a, after p4c, 2d
-    Interface auto-detection (psutil) :p5b, after p4c, 1d
-    Mode detection (sim vs actual)    :p5c, after p5b, 1d
-    Per-port interface mapping UI     :p5d, after p5a, 1d
-```
-
-### 8.2 Test Suite Priority Rationale
-
-| Priority | Specs | Rationale |
-|---|---|---|
-| **1. General (5.4)** | 10 | Foundation — validates basic switch operation before complex tests |
-| **2. Address Learning (5.5)** | 21 | Core switching intelligence — MAC learning affects all other test outcomes |
-| **3. VLAN (5.3)** | 21 | Most common automotive requirement — every vehicle network uses VLANs |
-| **4. Filtering (5.6)** | 11 | Security-relevant — increasingly important for automotive cybersecurity |
-| **5. QoS (5.8)** | 4 | Critical for ADAS/AD — priority traffic must be deterministic |
-| **6. Configuration (5.9)** | 3 | DUT-dependent — requires configuration interface |
-| **7. Time Sync (5.7)** | 1 | Hardware-dependent — requires specialized NIC or equipment |
-
----
-
-## 9. Quality & Validation Strategy
-
-### 9.1 Framework Self-Validation
+### 8.1 Framework Self-Validation
 
 Before testing any DUT, the framework must validate itself:
 
@@ -687,7 +635,7 @@ Before testing any DUT, the framework must validate itself:
 | **Timing calibration** | Measure round-trip time to known reference | Every test session start |
 | **Config validation** | Parse DUT profile → validate against schema | Before every test run |
 
-### 9.2 Test Result Classification
+### 8.2 Test Result Classification
 
 | Classification | Meaning | Action |
 |---|---|---|
@@ -697,7 +645,7 @@ Before testing any DUT, the framework must validate itself:
 | **SKIP** | Test not applicable to DUT configuration | Document reason |
 | **ERROR** | Test framework error (not DUT issue) | Fix framework |
 
-### 9.3 Reporting Requirements
+### 8.3 Reporting Requirements
 
 | Report Type | Format | Content |
 |---|---|---|
@@ -709,7 +657,7 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
-## 10. Resolved Questions & Implementation Decisions
+## 9. Resolved Questions & Implementation Decisions
 
 | # | Question | Impact | Resolution / Implementation Decision |
 |---|---|---|---|
@@ -724,7 +672,7 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
-## 11. Success Criteria
+## 10. Success Criteria
 
 | Metric | Target | Measurement |
 |---|---|---|
@@ -738,7 +686,7 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
-## 12. Glossary
+## 11. Glossary
 
 | Term | Definition |
 |---|---|
@@ -758,7 +706,7 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
-## 13. Next Steps
+## 12. Next Steps
 
 - **Parallel Execution**: Develop async runner architecture enhancements to support simultaneous traffic on multiple ports for reduced execution time.
 - **Hardware Interface Expansion**: Implement specialized plugins for direct automotive PHY (100BASE-T1), DoIP (ISO 13400), and USB-Ethernet adapter support.
@@ -769,7 +717,7 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
-## 14. Systemic Findings (Independent Inspection)
+## 13. Systemic Findings (Independent Inspection)
 
 | Area | Observation / Potential Issue | Impact |
 | --- | --- | --- |
@@ -781,7 +729,7 @@ Before testing any DUT, the framework must validate itself:
 
 ---
 
-## 15. Optional: Extended Diagnostic Session Management
+## 14. Optional: Extended Diagnostic Session Management
 
 For ECUs that require active session maintenance during configuration or testing, the framework supports an optional **Tester Present** heartbeat mechanism.
 

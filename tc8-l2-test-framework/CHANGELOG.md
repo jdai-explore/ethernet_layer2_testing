@@ -55,15 +55,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
-
-### Planned
-- CI/CD integration examples (Jenkins, GitLab CI, GitHub Actions)
-- Performance optimizations for full-tier execution
-- Advanced timing calibration tools
-- Additional DUT interface plugins (USB, DoIP)
-- Report export formats (PDF, CSV, JUnit XML)
-
----
-
 [0.1.0]: https://github.com/your-org/tc8-l2-test-framework/releases/tag/v0.1.0

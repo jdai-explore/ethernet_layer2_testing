@@ -2,195 +2,89 @@
 
 > **OPEN Alliance TC8 v3.0 Conformance Testing — Python/Scapy**
 
-A modular, open-architecture test framework for validating Layer 2 switching behavior of automotive Ethernet ECUs against the [OPEN Alliance TC8 Automotive Ethernet ECU Test Specification — Layer 2, v3.0](https://opensig.org/).
+A modular, open-architecture test framework for validating Layer 2 switching behavior of automotive Ethernet ECUs against the OPEN Alliance TC8 Automotive Ethernet ECU Test Specification — Layer 2, v3.0.
 
-[![Tests](https://img.shields.io/badge/tests-17%2F17%20passing-success)](tests/)
+[![Tests](https://img.shields.io/badge/tests-47%2F47%20passing-success)](tc8-l2-test-framework/tests/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## 📋 Coverage
+## What It Tests
 
-| Section | Topic | Specs | Status |
-|---------|-------|-------|--------|
-| 5.3 | VLAN Testing | 21 | ✅ Complete |
-| 5.4 | General | 10 | ✅ Complete |
-| 5.5 | Address Learning | 21 | ✅ Complete |
-| 5.6 | Filtering | 11 | ✅ Complete |
-| 5.7 | Time Synchronization | 1 | ✅ Complete |
-| 5.8 | Quality of Service | 4 | ✅ Complete |
-| 5.9 | Configuration | 3 | ✅ Complete |
-| **Total** | | **71** | **✅ 100%** |
+71 TC8 specifications across 7 sections:
 
-## 🚀 Quick Start
+| Section | Topic | Specs |
+|---------|-------|-------|
+| 5.3 | VLAN Testing | 21 |
+| 5.4 | General Switching | 10 |
+| 5.5 | Address Learning | 21 |
+| 5.6 | Filtering | 11 |
+| 5.7 | Time Synchronization | 1 |
+| 5.8 | Quality of Service | 4 |
+| 5.9 | Configuration | 3 |
+| **Total** | | **71 specs → 200,000+ test cases** |
 
-### Prerequisites: Packet Capture Driver
+Three execution tiers: **smoke** (~1 h) / **core** (~8 h) / **full** (40+ h)
 
-Scapy requires a packet capture driver to send/receive raw Ethernet frames:
-
-| OS | Required Package | Install Command |
-|----|-----------------|-----------------|
-| **Windows** | [Npcap](https://npcap.com/) (recommended) or WinPcap | Download from https://npcap.com/#download — install with **"WinPcap API-compatible Mode"** enabled |
-| **Linux (Debian/Ubuntu)** | libpcap-dev | `sudo apt-get install libpcap-dev` |
-| **Linux (RHEL/Fedora)** | libpcap-devel | `sudo dnf install libpcap-devel` |
-| **macOS** | libpcap (pre-installed) | Usually no action needed; if issues: `brew install libpcap` |
-
-> ⚠️ **Without a packet capture driver, Scapy will fail to send or sniff Ethernet frames.** The framework will still start but DUT communication will not work.
-
-### Installation
-
-#### Option 1: Automated Setup (Recommended)
-
-**Windows:**
-```powershell
-.\scripts\setup.ps1
-```
-
-**Linux/macOS:**
-```bash
-chmod +x scripts/setup.sh
-./scripts/setup.sh
-```
-
-#### Option 2: Docker
+## Quick Install
 
 ```bash
-docker-compose up -d
-# Access web UI: http://localhost:8000
-```
-
-#### Option 3: Manual Install
-
-```bash
-# Create virtual environment
+cd tc8-l2-test-framework
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or: venv\Scripts\activate  # Windows
-
-# Install dependencies
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-# Verify installation
-python -m pytest tests/unit/ tests/self_validation/ -v
 ```
 
-### Run Your First Test
+> **Windows**: Install [Npcap](https://npcap.com/) first (enable "WinPcap API-compatible Mode").  
+> **Linux**: `sudo apt-get install libpcap-dev`
+
+## Quick Smoke Run (No Hardware)
 
 ```bash
-# List available specs
-python -m src.cli specs
-
-# Run smoke tests with simulation DUT
 python -m src.cli run \
   --dut config/dut_profiles/examples/simulation_dut.yaml \
   --tier smoke \
-  --output reports/smoke_test.html
-
-# Start web UI
-uvicorn web.backend.main:app --host 0.0.0.0 --port 8000
-# Open: http://localhost:8000
+  --output reports/smoke_simulation.html
 ```
 
-## 📚 Documentation
+## Documentation
 
-- **[User Guide](docs/user_guide.md)** — Installation, configuration, running tests
-- **[Quick Start Tutorial](docs/tutorials/01_quick_start.md)** — 5-minute walkthrough
-- **[Creating DUT Profiles](docs/tutorials/02_custom_dut_profile.md)** — Configure your ECU
-- **[API Documentation](http://localhost:8000/docs)** — Interactive API docs (when server running)
+- **[User Guide](tc8-l2-test-framework/docs/user_guide.md)** — Install → what the app does → minimum test setup → ECU setup verification → DUT profile config → running tests → debugging → downloading reports
+- **[Quick Start Tutorial](tc8-l2-test-framework/docs/tutorials/01_quick_start.md)** — 5-minute simulation run
+- **[DUT Profile Tutorial](tc8-l2-test-framework/docs/tutorials/02_custom_dut_profile.md)** — Physical wiring and YAML configuration
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 tc8-l2-test-framework/
 ├── src/
-│   ├── core/           # Test runner, config manager, session manager
-│   ├── specs/          # Test specification implementations (7 sections)
-│   ├── reporting/      # HTML reports, DB persistence, result store
-│   ├── interface/      # DUT communication (Scapy, raw socket, TCP)
-│   ├── utils/          # Frame builder, timing, validators
+│   ├── core/           # Test runner, config manager, session manager, result validator
+│   ├── specs/          # Test specification implementations (7 TC8 sections)
+│   ├── reporting/      # HTML report generator, SQLite result store
+│   ├── interface/      # DUT communication (Scapy, raw socket, TCP stub, NullDUT)
 │   └── models/         # Pydantic data models
-├── web/                # FastAPI backend + Web UI
-├── config/             # YAML configurations & DUT profiles
-├── data/               # Data-driven spec definitions (71 YAML files)
-├── tests/              # Framework self-tests (17/17 passing)
-├── reports/            # Generated test reports
-└── docs/               # Documentation
+├── web/                # FastAPI backend + web UI (6-tab dashboard)
+├── config/             # DUT profile YAMLs and framework defaults
+├── data/               # 71 spec definition YAML files
+├── tests/              # Self-validation suite (47 tests)
+└── docs/               # User guide and tutorials
 ```
 
-## ⚙️ Test Tiers
+## DUT Interface Options
 
-| Tier | Duration | Specs | Use Case |
-|------|----------|-------|----------|
-| **smoke** | ~1 hour | 10 | Quick validation, CI/CD |
-| **core** | ~8 hours | 52 | Nightly regression |
-| **full** | 40+ hours | 71 | Pre-release validation |
+| Interface | Use case |
+|---|---|
+| **Scapy** (default) | Standard NICs, Windows + Linux |
+| **Raw Socket** | Linux `AF_PACKET` for high-performance |
+| **TCP Stub** | Remote DUT over network |
+| **NullDUT** | Simulation — no hardware needed |
 
-## 🔌 DUT Interface
-
-The framework uses a pluggable interface layer for DUT communication:
-
-- **Scapy** (default) — Standard packet crafting via `sendp`/`sniff`
-- **Raw Socket** — Linux `AF_PACKET` for performance-sensitive tests
-- **TCP Stub** — Remote DUT access over network
-- **NullDUT** — Simulation mode for framework testing
-
-## 📊 Features
-
-- ✅ **71 TC8 Specifications** — Complete Layer 2 test coverage
-- ✅ **200,000+ Test Cases** — Combinatorial test generation
-- ✅ **HTML Reports** — Beautiful, interactive test reports
-- ✅ **Database Persistence** — SQLAlchemy with trend analysis
-- ✅ **Web Dashboard** — 6-tab UI with real-time progress, report history, topology diagram
-- ✅ **Topology & Mode Detection** — Auto-detect interfaces, live wiring diagram, simulation/actual mode
-- ✅ **CLI Tool** — Headless execution for CI/CD
-- ✅ **Cross-Platform** — Windows, Linux, macOS, Docker
-- ✅ **Self-Validating** — 17 framework tests ensure correctness
-
-## 🐳 Docker Deployment
+## Docker
 
 ```bash
-# Build image
-docker build -t tc8-l2-test-framework .
-
-# Run web UI
 docker-compose up -d
-
-# Run CLI command
-docker-compose exec tc8-web python -m src.cli specs
-
-# View logs
-docker-compose logs -f tc8-web
+# Web UI: http://localhost:8000
 ```
 
-## 🧪 Testing
-
-```bash
-# Run all tests
-python -m pytest tests/ -v
-
-# Unit tests only
-python -m pytest tests/unit/ -v
-
-# Self-validation
-python -m pytest tests/self_validation/ -v
-
-# With coverage
-python -m pytest tests/ --cov=src --cov-report=html
-```
-
-## 📄 License
+## License
 
 Proprietary License
-
-
-## 📧 Support
-
-- **Issues**: [GitHub Issues](https://github.com/your-org/tc8-l2-test-framework/issues)
-- **Documentation**: [User Guide](docs/user_guide.md)
-- **Email**: 
-
----
-
-**Built with**: Python 3.11 • Scapy • FastAPI • SQLAlchemy • pytest  
-**Standard**: OPEN Alliance TC8 Layer 2 v3.0  
-**Status**: Production Ready ✅
-

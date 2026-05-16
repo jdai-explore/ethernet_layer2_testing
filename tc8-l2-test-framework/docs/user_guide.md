@@ -1,121 +1,317 @@
 # TC8 Layer 2 Test Framework — User Guide
 
-> **Version:** 0.1.0  
-> **Last Updated:** 2026-02-13
+> **Version:** 0.1.0 | **Standard:** OPEN Alliance TC8 Layer 2 v3.0
 
 ## Table of Contents
 
-1. [Introduction](#introduction)
-2. [Installation](#installation)
-3. [Quick Start](#quick-start)
-4. [DUT Configuration](#dut-configuration)
-5. [Running Tests](#running-tests)
-6. [Web Dashboard](#web-dashboard)
-7. [Topology & Mode Detection](#topology--mode-detection)
-8. [Understanding Reports](#understanding-reports)
-9. [Troubleshooting](#troubleshooting)
+1. [Installation](#1-installation)
+2. [What the Application Does](#2-what-the-application-does)
+3. [Minimum Test Setup](#3-minimum-test-setup)
+4. [Verifying Your ECU Test Setup](#4-verifying-your-ecu-test-setup)
+5. [DUT Profile Configuration](#5-dut-profile-configuration)
+6. [Running Tests](#6-running-tests)
+7. [Debugging](#7-debugging)
+8. [Downloading Reports](#8-downloading-reports)
 
 ---
 
-## Introduction
-
-The TC8 Layer 2 Test Framework validates automotive Ethernet ECU switching behavior against the OPEN Alliance TC8 specification v3.0. It covers:
-
-- **VLAN Testing** (21 specs) — 802.1Q tagging, PVID, trunk ports
-- **Address Learning** (21 specs) — MAC table, aging, forwarding
-- **Filtering** (11 specs) — Unicast, multicast, broadcast filtering
-- **QoS** (4 specs) — Priority code point (PCP) handling
-- **Time Sync** (1 spec) — gPTP support validation
-- **Configuration** (3 specs) — Startup modes, persistence
-- **General** (10 specs) — Frame forwarding, port isolation
-
-**Total: 71 specifications → 200,000+ test cases**
-
----
-
-## Installation
+## 1. Installation
 
 ### Prerequisites
 
-- **Python 3.10+** (3.11 recommended)
-- **Operating System**: Linux (recommended), Windows, or macOS
-- **Network Access**: Direct Ethernet connection to DUT ports
-- **Permissions**: Root/admin for raw socket access (Linux: `sudo`, Windows: Run as Administrator)
-- **Packet Capture Driver** (required for Scapy):
-  - **Windows**: [Npcap](https://npcap.com/) — download and install with **"WinPcap API-compatible Mode"** enabled
-  - **Linux**: `sudo apt-get install libpcap-dev` (Debian/Ubuntu) or `sudo dnf install libpcap-devel` (RHEL/Fedora)
-  - **macOS**: Pre-installed; if issues, run `brew install libpcap`
+| Requirement | Details |
+|---|---|
+| **Python** | 3.10+ (3.11 recommended) |
+| **OS** | Windows 10/11, Linux, macOS |
+| **Permissions** | Windows: Run as Administrator; Linux: `sudo` or `cap_net_raw` capability |
+| **Packet driver** | Required for Scapy raw Ethernet I/O (see table below) |
 
-> ⚠️ **Without a packet capture driver, Scapy cannot send or sniff raw Ethernet frames.** The framework will start in simulation mode but real DUT testing requires this driver.
+**Packet Capture Driver:**
 
-### Option 1: From Source
+| OS | Required | Install |
+|----|----------|---------|
+| Windows | [Npcap](https://npcap.com/) | Download installer; enable **"WinPcap API-compatible Mode"** |
+| Linux (Debian/Ubuntu) | libpcap-dev | `sudo apt-get install libpcap-dev` |
+| Linux (RHEL/Fedora) | libpcap-devel | `sudo dnf install libpcap-devel` |
+| macOS | libpcap (pre-installed) | `brew install libpcap` only if needed |
+
+> Without a packet capture driver, the framework starts but cannot send or receive real Ethernet frames — only simulation mode will work.
+
+### Install Steps
 
 ```bash
-# Clone repository
-git clone https://github.com/your-org/tc8-l2-test-framework.git
-cd tc8-l2-test-framework
-
-# Create virtual environment
+# 1. Create and activate a virtual environment
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or: venv\Scripts\activate  # Windows
+source venv/bin/activate          # Linux/macOS
+# or: venv\Scripts\activate       # Windows PowerShell
 
-# Install dependencies
+# 2. Install dependencies
 pip install -r requirements.txt
-
-# Verify installation
-python -m pytest tests/unit/ tests/self_validation/ -v
 ```
 
-### Option 2: Docker
-
+**Docker alternative:**
 ```bash
-# Pull image
-docker pull your-org/tc8-l2-test-framework:latest
-
-# Run smoke tests
-docker run --rm --network host \
-  -v $(pwd)/config:/app/config \
-  -v $(pwd)/reports:/app/reports \
-  tc8-l2-test-framework tc8 run --dut /app/config/dut_profiles/example_ecu.yaml --tier smoke
+docker-compose up -d
+# Web UI available at: http://localhost:8000
 ```
 
 ### Verify Installation
 
 ```bash
-# Check framework version
-python -m src.cli --version
-
-# Run diagnostics
-python -c "from src.utils.diagnostics import check_environment; check_environment()"
-
-# List available specs
-python -m src.cli specs
+python -m pytest tests/ -v
+# Expected: 47 passed
 ```
 
 ---
 
-## Quick Start
+## 2. What the Application Does
 
-### 1. Create a DUT Profile
+The TC8 Layer 2 Test Framework validates automotive Ethernet ECU switching behavior against the **OPEN Alliance TC8 specification v3.0**. It sends and captures raw Ethernet frames via connected NICs and checks that the DUT (Device Under Test — your ECU's Ethernet switch) behaves exactly as the TC8 spec requires.
 
-Create `config/dut_profiles/my_ecu.yaml`:
+### Spec Coverage
+
+| TC8 Section | Topic | Specs |
+|---|---|---|
+| 5.3 | VLAN Testing (tagging, PVID, trunks, double-tagging) | 21 |
+| 5.4 | General Switching (unicast, broadcast, frame sizes) | 10 |
+| 5.5 | Address Learning (MAC table, aging, port migration) | 21 |
+| 5.6 | Filtering (unicast/multicast/broadcast filtering) | 11 |
+| 5.7 | Time Synchronization (gPTP prerequisites) | 1 |
+| 5.8 | Quality of Service (PCP priority queuing) | 4 |
+| 5.9 | Configuration (startup, persistence) | 3 |
+| **Total** | | **71 specs → 200,000+ test cases** |
+
+### Execution Tiers
+
+| Tier | Duration | Specs | Typical Use |
+|------|----------|-------|-------------|
+| **smoke** | ~1 hour | 10 | Quick validation, CI/CD gate |
+| **core** | ~8 hours | 52 | Nightly regression |
+| **full** | 40+ hours | 71 | Pre-release compliance |
+
+### Outputs
+
+- **HTML report** — interactive, filterable results with frame-level detail and log entries
+- **SQLite database** — historical results with trend analysis at `reports/test_results.db`
+- **Web dashboard** — real-time progress, topology diagram, report history
+
+---
+
+## 3. Minimum Test Setup
+
+### Simulation Mode (No Hardware Required)
+
+Run a smoke test against the built-in NullDUT simulator:
+
+```bash
+python -m src.cli run \
+  --dut config/dut_profiles/examples/simulation_dut.yaml \
+  --tier smoke \
+  --output reports/smoke_simulation.html
+```
+
+This confirms the framework is installed correctly and produces a sample report.
+
+### Physical DUT Mode
+
+Minimum hardware requirements:
+- Test station with at least **2 NICs** connected to different DUT ports
+- Npcap (Windows) or libpcap (Linux) installed
+- A DUT profile YAML that maps your NIC names to DUT port IDs (see [Section 5](#5-dut-profile-configuration))
+
+**Minimum physical wiring (2-port test):**
+
+```
+Test Station NIC 0 (eth0)  ───── DUT Port 0
+Test Station NIC 1 (eth1)  ───── DUT Port 1
+```
+
+For full spec coverage, connect all DUT ports. Tests that require ports not connected will be marked SKIP automatically.
+
+### Network Topology Diagram
+
+The web dashboard **Topology** tab shows a live wiring diagram of your test station interfaces and DUT ports, color-coded by link state. Start the web server and open it to visually confirm your wiring before running tests:
+
+```bash
+uvicorn web.backend.main:app --host 0.0.0.0 --port 8000
+# Open: http://localhost:8000 → Topology tab
+```
+
+---
+
+## 4. Verifying Your ECU Test Setup
+
+Before running a full test tier, confirm that the framework can communicate with the DUT.
+
+### Step 1 — List Detected Interfaces
+
+```bash
+# Linux
+ip link show
+
+# Windows PowerShell
+ipconfig /all
+
+# Via web API (when server running)
+curl http://localhost:8000/api/interfaces
+```
+
+Match the interface names shown to the ports in your DUT profile.
+
+### Step 2 — Check Link State
+
+Each interface connected to the DUT should show link UP. In the web dashboard, the **Topology** tab displays 🟢 (up) or 🔴 (down) for each interface. From the command line:
+
+```bash
+# Linux
+ethtool eth0   # look for "Link detected: yes"
+
+# Windows — check Device Manager or use the web UI
+```
+
+If a link shows as down, check the cable and confirm the DUT is powered on.
+
+### Step 3 — Verify DUT Responds
+
+Run a single unicast forwarding spec to confirm end-to-end communication:
+
+```bash
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --spec SWITCH_GEN_001 \
+  --output reports/connectivity_check.html
+```
+
+A PASS result means the DUT forwarded the frame correctly. A FAIL or timeout means a wiring or configuration problem — see [Section 7 (Debugging)](#7-debugging).
+
+### Step 4 — Check Operating Mode
+
+The web dashboard shows a mode badge on the Dashboard tab:
+
+| Badge | Meaning |
+|---|---|
+| 🟢 ACTUAL | ≥1 mapped interface has link UP — real DUT testing |
+| 🟡 SIMULATION | No active links — NullDUT mode |
+
+A test run in SIMULATION mode exercises the framework logic but does not test the physical DUT. Ensure the mode badge shows ACTUAL before starting a compliance run.
+
+### Common Pre-Flight Failures
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| `OSError: No such device` | Npcap not installed or wrong interface name | Install Npcap; check interface name in DUT profile |
+| `Permission denied` (Linux) | Missing raw socket capability | Run with `sudo`, or `sudo setcap cap_net_raw,cap_net_admin=eip $(which python)` |
+| `No frames received (timeout)` | Link down or DUT not forwarding | Check cable, DUT power, DUT VLAN config |
+| `Interface not found: eth0` | Wrong name in DUT profile | Run `ip link show` and update the profile |
+
+---
+
+## 5. DUT Profile Configuration
+
+A DUT profile is a YAML file that tells the framework about your ECU: how many ports it has, which test station network interfaces are wired to each port, and what features the ECU supports.
+
+### Why It's Needed
+
+The framework must know:
+- Which NIC to send frames from (ingress port)
+- Which NICs to listen on for forwarded frames (egress ports)
+- What VLANs each port belongs to (so test case generation matches ECU config)
+- What optional features the ECU supports (so irrelevant test sections are skipped)
+
+### Field Reference
 
 ```yaml
-name: "My-ECU-4Port"
-model: "XC2000"
+# ── Identity ───────────────────────────────────────────────────────────
+name: "MyCompany-ECU-4Port"
+  # Human-readable name shown in reports
+
+model: "XC2000-4P"
+  # ECU model identifier (informational, used in reports)
+
+firmware_version: "v2.1.0"
+  # Firmware version under test (informational, logged in reports)
+
+port_count: 4
+  # Total number of Ethernet ports on the ECU switch.
+  # Must match the number of entries in the ports list below.
+
+# ── Port Configuration ─────────────────────────────────────────────────
+ports:
+  - port_id: 0
+    # Logical port number used throughout the framework (0-based).
+    # Test case IDs include this: e.g. SWITCH_VLAN_001_P0_P1_VID100
+
+    interface_name: "eth0"
+    # Name of the test station NIC wired to this DUT port.
+    # Linux: from `ip link show` (e.g. eth0, enp3s0, eno1)
+    # Windows: adapter name from `ipconfig /all` (e.g. "Ethernet 2")
+
+    mac_address: "02:00:00:00:00:00"
+    # MAC address of this DUT port. Used to build learning frames.
+    # Find this on the ECU datasheet or with a network scanner.
+    # Use locally-administered MAC format (second bit of first byte = 1)
+    # for test-only addresses: 02:xx:xx:xx:xx:xx
+
+    speed_mbps: 100
+    # Port link speed in Mbps. Used for timing calculations.
+    # Typical values: 10, 100, 1000
+
+    vlan_membership: [1, 100, 200]
+    # List of VLAN IDs this port belongs to.
+    # Must reflect the actual VLAN configuration on the ECU.
+    # The framework only generates test cases for VLANs listed here.
+
+    pvid: 1
+    # Port VLAN ID (native VLAN). Untagged frames arriving on this
+    # port are assigned this VLAN ID by the ECU switch.
+    # Must be one of the values in vlan_membership.
+
+    is_trunk: false
+    # false = access port: sends and receives untagged frames only.
+    # true  = trunk port: carries tagged frames for multiple VLANs.
+    # Must match the ECU port configuration.
+
+# ── Capabilities ───────────────────────────────────────────────────────
+max_mac_table_size: 1024
+  # Maximum number of MAC entries the ECU switch can learn.
+  # From ECU datasheet. Used in address learning stress tests.
+
+mac_aging_time_s: 300
+  # How long (seconds) the ECU keeps an unused MAC entry before
+  # removing it. From ECU datasheet. Used in aging tests.
+  # Typical values: 30–300 seconds.
+
+supports_double_tagging: false
+  # true if the ECU supports Q-in-Q (802.1ad / double VLAN tagging).
+  # Enables Section 5.3 double-tagging test cases.
+
+supports_gptp: false
+  # true if the ECU supports gPTP (IEEE 802.1AS time synchronization).
+  # Enables Section 5.7 time sync test case.
+
+can_reset: false
+  # true if the test framework can trigger an ECU reset (power cycle
+  # or software reset). Enables startup time and reset behavior tests.
+  # Leave false unless you have a controlled reset mechanism.
+```
+
+### Annotated Example — 4-Port ECU
+
+```yaml
+name: "MyCompany-ECU-Gateway"
+model: "XC2000-4P"
 firmware_version: "v2.1.0"
 port_count: 4
 
 ports:
   - port_id: 0
-    interface_name: "eth0"  # Your test station interface
+    interface_name: "eth0"
     mac_address: "02:00:00:00:00:00"
     speed_mbps: 100
-    vlan_membership: [1, 100, 200]
+    vlan_membership: [1]
     pvid: 1
     is_trunk: false
-    
+
   - port_id: 1
     interface_name: "eth1"
     mac_address: "02:00:00:00:00:01"
@@ -124,321 +320,235 @@ ports:
     pvid: 1
     is_trunk: true
 
-# ... ports 2-3 ...
+  - port_id: 2
+    interface_name: "eth2"
+    mac_address: "02:00:00:00:00:02"
+    speed_mbps: 100
+    vlan_membership: [100]
+    pvid: 100
+    is_trunk: false
 
-supported_features:
-  - vlan
-  - address_learning
-  - filtering
-  - qos
+  - port_id: 3
+    interface_name: "eth3"
+    mac_address: "02:00:00:00:00:03"
+    speed_mbps: 100
+    vlan_membership: [200]
+    pvid: 200
+    is_trunk: false
 
 max_mac_table_size: 1024
 mac_aging_time_s: 300
 supports_double_tagging: false
+supports_gptp: false
 can_reset: false
 ```
 
-### 2. Run Smoke Tests (CLI)
+Save as `config/dut_profiles/my_ecu.yaml`.
+
+### Validate the Profile
 
 ```bash
-# Execute smoke tier (~1 hour)
+python -c "
+from src.core.config_manager import ConfigManager
+cm = ConfigManager()
+p = cm.load_dut_profile('config/dut_profiles/my_ecu.yaml')
+print(f'OK: {p.name}, {p.port_count} ports')
+"
+```
+
+### Finding Interface Names
+
+**Linux:**
+```bash
+ip link show
+# Look for interfaces that show "state UP" when DUT cable is connected
+```
+
+**Windows:**
+```powershell
+ipconfig /all
+# Look for "Ethernet adapter" sections with a Default Gateway or physical address
+```
+
+**Via web UI:** Open the **DUT Configuration** tab at `http://localhost:8000`. It auto-lists all detected interfaces with live link status — click to assign an interface to each DUT port.
+
+---
+
+## 6. Running Tests
+
+### CLI
+
+```bash
+# Smoke tier (~1 hour)
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --tier smoke
+
+# Core tier (~8 hours)
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --tier core
+
+# Full tier (40+ hours)
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --tier full
+
+# Specific sections only
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --tier core \
+  --sections 5.3,5.5
+
+# Single spec (useful for debugging)
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --spec SWITCH_GEN_001
+
+# Save report to specific path
 python -m src.cli run \
   --dut config/dut_profiles/my_ecu.yaml \
   --tier smoke \
-  --output reports/smoke_run.html
-
-# View results
-open reports/smoke_run.html  # or: start reports/smoke_run.html (Windows)
-```
-
-### 3. Run Tests (Web UI)
-
-```bash
-# Start web server
-uvicorn web.backend.main:app --host 0.0.0.0 --port 8000
-
-# Open browser: http://localhost:8000
-# Select DUT profile, tier, click "Run Tests"
-```
-
----
-
-## DUT Configuration
-
-### Port Mapping
-
-Map DUT physical ports to test station network interfaces:
-
-| DUT Port | Test Station Interface | How to Find |
-|----------|------------------------|-------------|
-| Port 0 | `eth0` | Linux: `ip link show` |
-| Port 1 | `eth1` | Windows: `ipconfig /all` |
-| Port 2 | `eth2` | Look for interface connected to DUT |
-
-### VLAN Configuration
-
-```yaml
-ports:
-  - port_id: 0
-    vlan_membership: [1, 100, 200]  # VLANs this port belongs to
-    pvid: 1                          # Default VLAN for untagged frames
-    is_trunk: false                  # Access port (untagged)
-    
-  - port_id: 1
-    vlan_membership: [1, 100, 200, 300, 400]
-    pvid: 1
-    is_trunk: true                   # Trunk port (tagged)
-```
-
-### Feature Flags
-
-Enable/disable test sections based on DUT capabilities:
-
-```yaml
-supported_features:
-  - vlan                # Section 5.3
-  - address_learning    # Section 5.5
-  - filtering           # Section 5.6
-  - qos                 # Section 5.8
-  # - time_sync         # Omit if gPTP not supported
-  # - configuration     # Omit if config persistence not supported
-```
-
----
-
-## Running Tests
-
-### Test Tiers
-
-| Tier | Duration | Specs | Use Case |
-|------|----------|-------|----------|
-| **smoke** | ~1 hour | 10 | Quick validation, CI/CD |
-| **core** | ~8 hours | 52 | Nightly regression |
-| **full** | 40+ hours | 71 | Pre-release validation |
-
-### CLI Commands
-
-```bash
-# List available specs
-python -m src.cli specs
-
-# Filter by section
-python -m src.cli specs --section 5.3  # VLAN specs only
-
-# Run specific tier
-python -m src.cli run --dut my_ecu.yaml --tier smoke
-
-# Run specific sections
-python -m src.cli run --dut my_ecu.yaml --tier core --sections 5.3,5.5
-
-# View test history
-python -m src.cli history --limit 10
-
-# Regenerate report
-python -m src.cli report <report-id>
+  --output reports/my_run.html
 ```
 
 ### Web Dashboard
 
 ```bash
 uvicorn web.backend.main:app --host 0.0.0.0 --port 8000
-# Open: http://localhost:8000
 ```
 
-The web UI has **6 tabs**:
+Open `http://localhost:8000` and use the **Run Tests** tab:
 
-| Tab | Purpose |
-|-----|--------|
-| 🎛️ **Dashboard** | Spec coverage, recent test runs, mode badge |
-| 🗺️ **Topology** | Live station ↔ DUT wiring diagram, connection status |
-| 🔧 **DUT Configuration** | Create/load profiles, per-port interface mapping |
-| 🚀 **Run Tests** | Select DUT + tier, execute with real-time progress |
-| 🩺 **Pre-flight Checks** | Validate framework environment |
-| 📋 **Console** | Real-time log streaming via WebSocket |
+1. Select DUT profile from the dropdown (or create one in the **DUT Configuration** tab)
+2. Select test tier (smoke / core / full)
+3. Optionally filter by TC8 section
+4. Click **Start Test**
+5. Watch the progress bar and live result stream
+6. Click the report link when the run completes
 
-**DUT Configuration Tab**:
-1. Select an existing profile from the dropdown, or create a new one
-2. Fill in ECU name, model, firmware, port count, and feature flags
-3. Map each DUT port to a test station OS interface using the **Port ↔ Interface Mapping** table — detected interfaces are auto-populated with link status (🟢 up / 🔴 down)
-4. Click **Save Profile** to create the YAML file
+### Stopping a Run
 
-**Run Tests Tab**:
-1. Select a DUT profile and test tier (smoke/core/full)
-2. Choose TC8 sections to include
-3. Click **Start Test** — progress bar and live results appear
-4. Click the report link when complete
+Press `Ctrl+C` in the terminal (CLI) or click **Stop** in the web UI. Results collected so far are saved to the database.
 
 ---
 
-## Topology & Mode Detection
+## 7. Debugging
 
-The framework automatically detects your test station's network interfaces and determines whether you have real DUT hardware connected.
-
-### Operating Modes
-
-| Mode | Meaning | How Triggered |
-|------|---------|---------------|
-| 🟢 **ACTUAL** | Real DUT hardware detected | ≥1 mapped interface is link-UP |
-| 🟡 **SIMULATION** | No hardware / all interfaces down | Default when no links active |
-
-Mode badges appear on the **Dashboard** and **Topology** tabs. A warning banner appears on the **Run Tests** tab when in simulation mode.
-
-### Interface Detection API
-
-```
-GET /api/interfaces
-```
-
-Returns all detected OS network interfaces with link status, MAC address, IP, speed, and MTU. Virtual/loopback interfaces are filtered out.
-
-### Topology API
-
-```
-GET /api/topology
-```
-
-Returns the DUT ↔ station mapping, including per-port connection status (up / down / unmapped), the current operating mode, and active link count.
-
-### Topology Diagram
-
-The 🗺️ **Topology** tab shows a live wiring diagram:
-- **Left box**: Test station interfaces with link status dots
-- **Right box**: DUT ports (from loaded profile)
-- **Wires**: Color-coded connections (🟢 active, 🔴 link down, gray dashed = unmapped)
-- **Auto-refresh**: Updates every 5 seconds using OS-level interface status checks (`psutil`). **No packets are sent to the DUT** — the polling only reads the host NIC driver's link state, so it has zero impact on simulation or test execution.
-- **Hover tooltips**: Show MAC address, IP, VLAN membership, PVID
-
----
-
-## Understanding Reports
-
-### Summary Section
-
-```
-Total Cases: 5,234
-Passed: 5,102 (97.5%)
-Failed: 98 (1.9%)
-Informational: 34 (0.6%)
-```
-
-- **Pass**: DUT behaved as expected per TC8 spec
-- **Fail**: DUT violated TC8 requirement (compliance issue)
-- **Informational**: Observation only, not pass/fail
-- **Skip**: Test not applicable to this DUT
-- **Error**: Framework issue (not DUT fault)
-
-### Section Breakdown
-
-Each TC8 section shows pass rate:
-
-| Section | Passed | Failed | Pass Rate |
-|---------|--------|--------|-----------|
-| 5.3 VLAN | 1,234 | 12 | 99.0% |
-| 5.5 Address Learning | 987 | 45 | 95.6% |
-
-### Detailed Results
-
-Each test case shows:
-- **Case ID**: `SWITCH_VLAN_001_P0_P1_VID100`
-- **TC8 Reference**: `5.3.1` (links to spec clause)
-- **Status**: PASS/FAIL
-- **Message**: Human-readable explanation
-- **Duration**: Execution time
-- **Frames**: Sent/received counts
-
-### Debugging Failures
-
-**Example Failure**:
-```
-[FAIL] SWITCH_VLAN_001_P0_P1_VID100
-Message: Expected frame on port 1, got drop
-Expected: Forward tagged frame with VID=100
-Actual: No frame received (timeout 500ms)
-```
-
-**Troubleshooting Steps**:
-1. Check DUT VLAN configuration — is VID 100 configured?
-2. Check port membership — is port 1 in VLAN 100?
-3. Check trunk mode — is port 1 configured as trunk?
-4. Review DUT logs for errors
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-#### Packet capture driver not installed
-
-Scapy requires a packet capture driver for raw Ethernet I/O:
+### Increase Log Verbosity
 
 ```bash
-# Windows — install Npcap from https://npcap.com/
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --tier smoke \
+  --log-level DEBUG
+```
+
+DEBUG output shows every frame sent and received, per-port capture counts, and session setup/teardown events.
+
+### Reading the HTML Report
+
+Each test case row in the report is clickable and expands to show:
+- **Expected vs. Actual**: What the framework expected the DUT to do and what it observed
+- **Frame details**: Hexdump of sent frames, per-port received frame counts
+- **Log entries**: Session setup/teardown logs, per-case debug messages with timestamps
+
+Log entries are color-coded by level: INFO (blue), DEBUG (gray), WARNING (orange), ERROR (red).
+
+### Running a Single Spec
+
+Isolate a failing spec to see detailed output:
+
+```bash
+python -m src.cli run \
+  --dut config/dut_profiles/my_ecu.yaml \
+  --spec SWITCH_VLAN_001 \
+  --log-level DEBUG
+```
+
+### Scapy / Packet Capture Troubleshooting
+
+**Symptom**: `RuntimeError: Sniffing requires Npcap` or `OSError: No such device`
+```bash
+# Windows: install Npcap from https://npcap.com/
 # Enable "WinPcap API-compatible Mode" during install
-
-# Linux (Debian/Ubuntu)
-sudo apt-get install libpcap-dev
-
-# Linux (RHEL/Fedora)
-sudo dnf install libpcap-devel
-
-# macOS (if needed)
-brew install libpcap
 ```
 
-**Symptoms**: `OSError: No such device`, Scapy import errors, or `RuntimeError: Sniffing requires Npcap`.
-
-#### "No module named 'scapy'"
+**Symptom**: `PermissionError` on Linux
 ```bash
-pip install scapy>=2.5.0
-```
-
-#### "Permission denied" (Linux)
-```bash
-# Run with sudo for raw socket access
+# Option A: run with sudo
 sudo python -m src.cli run --dut my_ecu.yaml --tier smoke
 
-# Or: Add capabilities to Python binary
+# Option B: grant capabilities once (survives reboots)
 sudo setcap cap_net_raw,cap_net_admin=eip $(which python)
 ```
 
-#### "Interface not found: eth0"
-```bash
-# List available interfaces
-ip link show  # Linux
-ipconfig /all  # Windows
+**Symptom**: Frames sent but none captured on egress ports
+- Confirm cables are connected and link is UP (`ethtool eth0` on Linux)
+- Confirm the DUT VLAN configuration matches the profile (`vlan_membership`, `pvid`, `is_trunk`)
+- Check if the DUT's NIC driver strips VLAN tags before delivery (Windows Npcap known issue — enable VLAN passthrough in Npcap settings)
 
-# Update DUT profile with correct interface names
-```
+### Interpreting Result Statuses
 
-#### "Timing tests fail with ±50ms variance"
-```bash
-# Calibrate timing
-python -c "from src.utils.diagnostics import calibrate_timing; calibrate_timing()"
+| Status | Meaning | Action |
+|---|---|---|
+| **PASS** | DUT behaved as TC8 requires | None |
+| **FAIL** | DUT violated a TC8 requirement | Investigate DUT config or firmware |
+| **INFORMATIONAL** | Observation logged, no pass/fail verdict | Review for context |
+| **SKIP** | Test not applicable (hardware not connected, feature not supported) | Acceptable if DUT doesn't support the feature |
+| **ERROR** | Framework exception, not a DUT fault | Check logs; may indicate misconfiguration |
 
-# For <±10ms precision, use Linux with real-time kernel
-```
+### Common FAIL Patterns
 
-#### "All tests timeout"
-```bash
-# Check DUT connectivity
-ping <DUT_IP>
+**"Expected frame on port X, got nothing"**
+- DUT dropped the frame or sent it to a different port
+- Check VLAN membership and port configuration
 
-# Verify link status
-ethtool eth0  # Linux
-```
+**"VLAN tag mismatch: expected VID=100, got VID=0"**
+- DUT stripped or replaced the VLAN tag
+- Check DUT trunk/access mode and PVID settings
 
-### Getting Help
-
-- **GitHub Issues**: https://github.com/your-org/tc8-l2-test-framework/issues
-- **Documentation**: https://tc8-l2-docs.readthedocs.io
-- **Email**: tc8-support@your-org.com
+**"Frame received on port X (should not forward there)"**
+- DUT flooded instead of forwarding to the learned port
+- May indicate MAC learning is not working — check DUT logs
 
 ---
 
-## Next Steps
+## 8. Downloading Reports
 
-- **Tutorial**: [Quick Start Walkthrough](tutorials/01_quick_start.md)
-- **Advanced**: [Creating Custom DUT Profiles](tutorials/02_custom_dut_profile.md)
-- **CI/CD**: [Jenkins/GitLab Integration](tutorials/04_ci_cd_integration.md)
-- **Developer Guide**: [Extending the Framework](developer_guide.md)
+### HTML Report
+
+Reports are auto-saved to `reports/archives/` after every run with a timestamped filename. Open any `.html` file in a browser — no server needed, all data is embedded.
+
+```bash
+# Windows
+start reports\archives\tc8_run_2026-05-16_143022.html
+
+# Linux
+xdg-open reports/archives/tc8_run_2026-05-16_143022.html
+```
+
+### Download via Web UI
+
+In the web dashboard:
+1. Open the **Reports** tab
+2. Find your run in the history table
+3. Click **Download** to save the HTML file
+
+### SQLite Database
+
+All results are stored in `reports/test_results.db`. Query with any SQLite client:
+
+```bash
+sqlite3 reports/test_results.db
+> SELECT report_id, passed, failed, duration_s FROM test_runs ORDER BY created_at DESC LIMIT 10;
+```
+
+### List Recent Reports (CLI)
+
+```bash
+python -m src.cli history --limit 10
+
+# Re-generate HTML for a specific run
+python -m src.cli report <report-id>
+```

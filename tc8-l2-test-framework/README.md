@@ -1,60 +1,20 @@
-# TC8 Layer 2 Automotive Ethernet Test Framework
+# TC8 Layer 2 Test Framework
 
-Professional test framework for OPEN Alliance TC8 Layer 2 (v3.0) conformance testing. Supports VLAN membership, priority tagging, filtering, and general switching validation on real hardware using Scapy.
+This directory contains the framework package. For full setup and usage instructions, see:
 
-## 🚀 Quick Start
+- **[Root README](../../README.md)** — Project overview, quick install, architecture
+- **[User Guide](docs/user_guide.md)** — Complete operational guide (install → run → debug → reports)
+- **[Quick Start Tutorial](docs/tutorials/01_quick_start.md)** — 5-minute simulation run
+- **[DUT Profile Tutorial](docs/tutorials/02_custom_dut_profile.md)** — Wiring and YAML configuration
 
-### 1. Prerequisites
-- **Python**: 3.10 or higher.
-- **Hardware Interface**: At least one Ethernet interface connected to your DUT.
-- **Windows (Critical)**:
-    - Install [Npcap](https://npcap.com/#download).
-    - **Important**: During installation, ensure you check "Support loopback adapter" and if possible, ensure NIC drivers are configured to NOT strip VLAN tags (hardware dependent).
+## Package Structure
 
-### 2. Installation
-```bash
-# Clone the repository
-git clone <repo-url>
-cd tc8-l2-test-framework
-
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Usage
-
-#### Web UI (Recommended)
-```bash
-python -m uvicorn web.backend.main:app --host 0.0.0.0 --port 8000
-```
-Then open http://localhost:8000 in your browser.
-
-#### CLI
-```bash
-# Run the smoke suite
-python -m src.cli run --tier smoke
-
-# List all supported specifications
-python -m src.cli list
-```
-
-## 🛠 Project Structure
-- `src/`: Core framework logic, specs, and interfaces.
-- `web/`: FastAPI backend and static frontend assets.
-- `config/`: DUT profiles (YAML) define your hardware setup.
-- `data/`: Spec definitions (YAML) following TC8 standards.
-- `reports/`: Historical test reports in HTML format.
-
-## 🧪 Testing Focus
-- **Section 5.3**: VLAN (Membership, Tagging, Double-Tagging).
-- **Section 5.4**: General (Unicast, Broadcast, Flooding).
-- **Section 5.5**: Address Learning (MAC table behavior).
-- **Section 5.7**: Time Sync (gPTP/TSN prerequisites).
-- **Section 5.8**: Quality of Service (Priority queuing).
-
-## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+| Directory | Contents |
+|---|---|
+| `src/` | Core framework: test runner, config manager, session manager, spec handlers, DUT interface layer, reporting |
+| `web/` | FastAPI backend and static web UI |
+| `config/` | YAML configurations and DUT profile examples |
+| `data/` | Data-driven spec definitions (71 YAML files, one per TC8 spec) |
+| `tests/` | Framework self-validation suite (47 tests) |
+| `reports/` | Generated HTML reports and SQLite database |
+| `docs/` | User guide and tutorials |
