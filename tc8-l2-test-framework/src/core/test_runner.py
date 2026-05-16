@@ -8,6 +8,7 @@ parallel port testing, tiered execution, and progress reporting.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 import uuid
@@ -70,11 +71,14 @@ class TestCaseGenerator:
         """Generate all test cases for a single specification."""
         tier_cfg = self.config.get_tier_config(tier)
 
-        # Determine parameter ranges based on tier
+        # Determine parameter ranges based on tier and spec YAML
         vid_range = self._get_vid_range(spec, tier_cfg)
         frame_types = self._get_frame_types(spec)
         tpid_values = spec.applicable_tpids
         port_pairs = self._get_port_pairs(spec, tier_cfg)
+        pcp_values = spec.parameters.get("pcp_values", [0])
+        payload_sizes = spec.parameters.get("payload_sizes", [64])
+        inner_vids = spec.parameters.get("inner_vid_range", [None])
 
         cases: list[TestCase] = []
         for ingress, egress in port_pairs:
@@ -82,22 +86,37 @@ class TestCaseGenerator:
                 for frame_type in frame_types:
                     tpids = tpid_values if frame_type != FrameType.UNTAGGED else [0x8100]
                     for tpid in tpids:
-                        case_id = self._make_case_id(spec, ingress, egress, vid, frame_type, tpid)
-                        cases.append(TestCase(
-                            case_id=case_id,
-                            spec_id=spec.spec_id,
-                            tc8_reference=spec.tc8_reference,
-                            section=spec.section,
-                            tier=tier,
-                            parameters=TestCaseParameters(
-                                ingress_port=ingress,
-                                egress_ports=egress if isinstance(egress, list) else [egress],
-                                vid=vid,
-                                frame_type=frame_type,
-                                tpid=tpid,
-                            ),
-                            description=f"{spec.title} — Port {ingress}→{egress}, VID={vid}, {frame_type.value}",
-                        ))
+                        for pcp in pcp_values:
+                            for payload_size in payload_sizes:
+                                ivid_range = inner_vids if frame_type == FrameType.DOUBLE_TAGGED else [None]
+                                for inner_vid in ivid_range:
+                                    custom: dict[str, Any] = {}
+                                    if inner_vid is not None:
+                                        custom["inner_vid"] = inner_vid
+                                    case_id = self._make_case_id(
+                                        spec, ingress, egress, vid, frame_type, tpid, pcp, payload_size
+                                    )
+                                    cases.append(TestCase(
+                                        case_id=case_id,
+                                        spec_id=spec.spec_id,
+                                        tc8_reference=spec.tc8_reference,
+                                        section=spec.section,
+                                        tier=tier,
+                                        parameters=TestCaseParameters(
+                                            ingress_port=ingress,
+                                            egress_ports=egress if isinstance(egress, list) else [egress],
+                                            vid=vid,
+                                            frame_type=frame_type,
+                                            tpid=tpid,
+                                            pcp=pcp,
+                                            payload_size=payload_size,
+                                            custom=custom,
+                                        ),
+                                        description=(
+                                            f"{spec.title} — Port {ingress}→{egress}, "
+                                            f"VID={vid}, {frame_type.value}, PCP={pcp}"
+                                        ),
+                                    ))
 
         logger.info(
             "Generated %d test cases for %s (tier=%s)",
@@ -148,15 +167,22 @@ class TestCaseGenerator:
         vid: int,
         frame_type: FrameType,
         tpid: int,
+        pcp: int = 0,
+        payload_size: int = 64,
     ) -> str:
         """Generate a unique, human-readable test case ID."""
         eg = egress if isinstance(egress, int) else "_".join(str(e) for e in egress)
         ft_short = {"untagged": "UT", "single_tagged": "ST", "double_tagged": "DT"}
-        return (
+        base = (
             f"{spec.spec_id}_P{ingress}_P{eg}_V{vid}"
             f"_{ft_short.get(frame_type.value, 'XX')}"
             f"_T{tpid:04X}"
         )
+        if pcp != 0:
+            base += f"_PCP{pcp}"
+        if payload_size != 64:
+            base += f"_SZ{payload_size}"
+        return base
 
 
 # ---------------------------------------------------------------------------
@@ -256,48 +282,39 @@ class TestRunner:
             total_cases=len(all_cases),
         )
 
-        # Execute test cases
-        t0 = time.perf_counter()
-        # Execute test cases grouped by specification to reuse sessions
+        # Execute test cases — each case gets its own isolated session so that
+        # MAC tables, VLAN state, counters, and storm-control state cannot leak
+        # between cases (PRD requirement: per-case isolation).
         t0 = time.perf_counter()
         executed_count = 0
 
-        # Maintain original order but group contiguous specs
-        from itertools import groupby
-        for spec_id, spec_cases in groupby(all_cases, key=lambda x: x.spec_id):
-            spec_cases_list = list(spec_cases)
-            
-            # Start a single session for the entire group of cases for this spec
-            async with self.session.test_session() as session:
-                for case in spec_cases_list:
-                    if self._cancel_requested:
-                        break
-
-                    # Execute case within the shared session
-                    result = await self._execute_case(case, session=session)
-                    report.results.append(result)
-
-                    # Update counters
-                    match result.status:
-                        case TestStatus.PASS:
-                            report.passed += 1
-                        case TestStatus.FAIL:
-                            report.failed += 1
-                        case TestStatus.INFORMATIONAL:
-                            report.informational += 1
-                        case TestStatus.SKIP:
-                            report.skipped += 1
-                        case TestStatus.ERROR:
-                            report.errors += 1
-
-                    # Progress callback
-                    executed_count += 1
-                    if self.progress_callback:
-                        self.progress_callback(executed_count, len(all_cases), case.case_id, result.status)
-
+        for case in all_cases:
             if self._cancel_requested:
                 logger.info("Test run cancelled at case %d/%d", executed_count, len(all_cases))
                 break
+
+            async with self.session.test_session() as session:
+                result = await self._execute_case(case, session=session)
+
+            report.results.append(result)
+
+            match result.status:
+                case TestStatus.PASS:
+                    report.passed += 1
+                case TestStatus.FAIL:
+                    report.failed += 1
+                case TestStatus.INFORMATIONAL:
+                    report.informational += 1
+                case TestStatus.SKIP:
+                    report.skipped += 1
+                case TestStatus.ERROR:
+                    report.errors += 1
+
+            executed_count += 1
+            if self.progress_callback:
+                coro = self.progress_callback(executed_count, len(all_cases), case.case_id, result.status)
+                if inspect.isawaitable(coro):
+                    await coro
 
         report.duration_s = time.perf_counter() - t0
         self._running = False

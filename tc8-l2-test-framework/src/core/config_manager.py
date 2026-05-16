@@ -229,6 +229,10 @@ class ConfigManager:
 
                 # Timing tier
                 timing_str = spec_data.pop("timing_tier", "tier_a")
+                if timing_str not in [t.value for t in TimingTier]:
+                    logger.warning(
+                        "Unknown timing_tier %r in spec %s — defaulting to TIER_A", timing_str, spec_id
+                    )
                 timing = TimingTier(timing_str) if timing_str in [t.value for t in TimingTier] else TimingTier.TIER_A
 
                 self._spec_definitions[spec_id] = TestSpecDefinition(

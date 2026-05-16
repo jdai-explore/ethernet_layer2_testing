@@ -247,7 +247,7 @@ async def run_suite(request: RunSuiteRequest) -> RunSuiteResponse:
             except Exception:
                 pass
 
-    active_runner = TestRunner(config, session_mgr, validator, interface=interface)
+    active_runner = TestRunner(config, session_mgr, validator, interface=interface, progress_callback=ws_progress)
     tier = TestTier(request.tier)
     report = await active_runner.run_suite(tier, sections, request.spec_ids)
     active_runner = None

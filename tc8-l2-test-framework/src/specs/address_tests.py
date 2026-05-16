@@ -83,22 +83,52 @@ class AddressTests(BaseTestSpec):
         """
         SWITCH_ADDR_001 — Source MAC learning.
 
-        Send frame from Port A with SRC_MAC=X. Then send unicast to
-        DST_MAC=X from Port B. Verify frame is forwarded ONLY to Port A.
+        Phase 1 (learn): send a broadcast from ingress_port with src_mac=X so
+        the switch learns X → ingress_port.
+        Phase 2 (probe): send unicast dst_mac=X from egress_port and verify the
+        frame arrives ONLY on ingress_port (not flooded).
         """
         self.log_spec_info(spec)
         params = case.parameters
         t0 = time.perf_counter()
 
-        sent, received = await self._send_and_capture(case, interface)
+        if interface is None:
+            # Simulation cannot replay real MAC-learning state machine.
+            return TestResult(
+                case_id=case.case_id, spec_id=case.spec_id,
+                tc8_reference=case.tc8_reference, section=case.section,
+                status=TestStatus.INFORMATIONAL,
+                message="Simulation mode cannot verify MAC learning — requires real DUT",
+            )
+
+        # Phase 1: learn — flood a frame so the switch records src_mac on ingress_port
+        learn_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"dst_mac": "ff:ff:ff:ff:ff:ff"}),
+        })
+        await interface.send_and_capture(learn_case)
+
+        # Phase 2: probe — unicast to learned MAC from a different port
+        probe_port = params.egress_ports[0] if params.egress_ports else params.ingress_port
+        probe_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={
+                "ingress_port": probe_port,
+                "dst_mac": params.src_mac,
+                "src_mac": "02:00:00:00:ff:01",
+            }),
+        })
+        sent, received = await interface.send_and_capture(probe_case)
         duration_ms = (time.perf_counter() - t0) * 1000
 
+        dut = self.config.dut_profile
+        all_ports = [p.port_id for p in (dut.ports if dut else [])]
+        blocked = [p for p in all_ports if p not in (params.ingress_port, probe_port)]
         expected = {
-            "forward_to_ports": params.egress_ports,
+            "forward_to_ports": [params.ingress_port],
+            "blocked_ports": blocked,
             "strict_forwarding": True,
             **spec.expected_result,
         }
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(probe_case, sent, received, expected, duration_ms)
 
     async def _test_learned_unicast_forwarding(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -112,18 +142,58 @@ class AddressTests(BaseTestSpec):
         """
         SWITCH_ADDR_003 — MAC port migration.
 
-        Learn MAC=X on Port A, then send frame with SRC_MAC=X on Port B.
-        Verify MAC table updates to Port B.
+        Phase 1: learn MAC=X on ingress_port (Port A).
+        Phase 2: send frame with src_mac=X from egress_ports[0] (Port B) — MAC migrates.
+        Phase 3: probe unicast to MAC=X from ingress_port and verify it now arrives on Port B.
         """
         self.log_spec_info(spec)
         params = case.parameters
         t0 = time.perf_counter()
 
-        sent, received = await self._send_and_capture(case, interface)
+        if interface is None:
+            return TestResult(
+                case_id=case.case_id, spec_id=case.spec_id,
+                tc8_reference=case.tc8_reference, section=case.section,
+                status=TestStatus.INFORMATIONAL,
+                message="Simulation mode cannot verify MAC port migration — requires real DUT",
+            )
+
+        new_port = params.egress_ports[0] if params.egress_ports else params.ingress_port
+
+        # Phase 1: learn MAC=X on Port A
+        learn_a = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"dst_mac": "ff:ff:ff:ff:ff:ff"}),
+        })
+        await interface.send_and_capture(learn_a)
+
+        # Phase 2: migrate — send with same src_mac from Port B
+        migrate_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={
+                "ingress_port": new_port,
+                "dst_mac": "ff:ff:ff:ff:ff:ff",
+            }),
+        })
+        await interface.send_and_capture(migrate_case)
+
+        # Phase 3: probe from Port A to MAC=X — should now arrive only on Port B
+        probe_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={
+                "dst_mac": params.src_mac,
+                "src_mac": "02:00:00:00:ff:02",
+            }),
+        })
+        sent, received = await interface.send_and_capture(probe_case)
         duration_ms = (time.perf_counter() - t0) * 1000
 
-        expected = {**spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        dut = self.config.dut_profile
+        all_ports = [p.port_id for p in (dut.ports if dut else [])]
+        blocked = [p for p in all_ports if p not in (new_port, params.ingress_port)]
+        expected = {
+            "forward_to_ports": [new_port],
+            "blocked_ports": blocked,
+            **spec.expected_result,
+        }
+        return self.validator.validate(probe_case, sent, received, expected, duration_ms)
 
     async def _test_unknown_unicast_flooding(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -137,8 +207,10 @@ class AddressTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        case.parameters.dst_mac = "02:ff:ff:ff:ff:fe"
-        sent, received = await self._send_and_capture(case, interface)
+        flood_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"dst_mac": "02:ff:ff:ff:ff:fe"}),
+        })
+        sent, received = await self._send_and_capture(flood_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         dut = self.config.dut_profile
@@ -146,7 +218,7 @@ class AddressTests(BaseTestSpec):
                      if p.port_id != params.ingress_port]
 
         expected = {"forward_to_ports": all_other, **spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(flood_case, sent, received, expected, duration_ms)
 
     # ── Table & Aging (005-007) ───────────────────────────────────────
 
@@ -221,11 +293,13 @@ class AddressTests(BaseTestSpec):
         """SWITCH_ADDR_009 — Broadcast source MAC rejected."""
         self.log_spec_info(spec)
         t0 = time.perf_counter()
-        case.parameters.src_mac = "ff:ff:ff:ff:ff:ff"
-        sent, received = await self._send_and_capture(case, interface)
+        bcast_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"src_mac": "ff:ff:ff:ff:ff:ff"}),
+        })
+        sent, received = await self._send_and_capture(bcast_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {**spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(bcast_case, sent, received, expected, duration_ms)
 
     async def _test_invalid_source_mac_multicast(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -233,11 +307,13 @@ class AddressTests(BaseTestSpec):
         """SWITCH_ADDR_010 — Multicast source MAC handling."""
         self.log_spec_info(spec)
         t0 = time.perf_counter()
-        case.parameters.src_mac = "01:00:5e:00:00:01"
-        sent, received = await self._send_and_capture(case, interface)
+        mcast_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"src_mac": "01:00:5e:00:00:01"}),
+        })
+        sent, received = await self._send_and_capture(mcast_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {**spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(mcast_case, sent, received, expected, duration_ms)
 
     # ── Extended tests (011-021) ──────────────────────────────────────
 

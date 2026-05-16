@@ -92,10 +92,13 @@ class GeneralTests(BaseTestSpec):
             # Send a frame FROM dst_mac on the expected egress port
             # so the DUT associates dst_mac with that port.
             if params.egress_ports:
-                learning_case = case.model_copy(deep=True)
-                learning_case.parameters.src_mac = params.dst_mac
-                learning_case.parameters.dst_mac = params.src_mac
-                learning_case.parameters.ingress_port = params.egress_ports[0]
+                learning_case = case.model_copy(update={
+                    "parameters": case.parameters.model_copy(update={
+                        "src_mac": params.dst_mac,
+                        "dst_mac": params.src_mac,
+                        "ingress_port": params.egress_ports[0],
+                    }),
+                })
                 await interface.send_frame(learning_case)
                 await asyncio.sleep(0.5)  # Allow DUT to process learning
 
@@ -142,21 +145,21 @@ class GeneralTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        # Override destination to broadcast
-        case.parameters.dst_mac = "ff:ff:ff:ff:ff:ff"
+        bcast_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"dst_mac": "ff:ff:ff:ff:ff:ff"}),
+        })
 
         sent_frames: list[FrameCapture] = []
         received: dict[int, list[FrameCapture]] = {}
 
         if interface is not None:
-            sent_frames = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
+            sent_frames = await interface.send_frame(bcast_case)
+            received = await interface.capture_frames(bcast_case)
         else:
             sent_frames = [FrameCapture(
                 port_id=params.ingress_port, timestamp=time.time(),
                 src_mac=params.src_mac, dst_mac="ff:ff:ff:ff:ff:ff",
             )]
-            # Simulate: broadcast goes to all other ports
             dut = self.config.dut_profile
             if dut:
                 for p in dut.ports:
@@ -176,11 +179,11 @@ class GeneralTests(BaseTestSpec):
 
         expected = {
             "forward_to_ports": all_other_ports,
-            "strict_forwarding": False,  # broadcast flooding is expected
+            "strict_forwarding": False,
             **spec.expected_result,
         }
 
-        return self.validator.validate(case, sent_frames, received, expected, duration_ms)
+        return self.validator.validate(bcast_case, sent_frames, received, expected, duration_ms)
 
     async def _test_multicast_forwarding(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -195,14 +198,16 @@ class GeneralTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        case.parameters.dst_mac = "01:00:5e:00:00:01"
+        mcast_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"dst_mac": "01:00:5e:00:00:01"}),
+        })
 
         sent_frames: list[FrameCapture] = []
         received: dict[int, list[FrameCapture]] = {}
 
         if interface is not None:
-            sent_frames = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
+            sent_frames = await interface.send_frame(mcast_case)
+            received = await interface.capture_frames(mcast_case)
         else:
             sent_frames = [FrameCapture(
                 port_id=params.ingress_port, timestamp=time.time(),
@@ -224,7 +229,7 @@ class GeneralTests(BaseTestSpec):
                      if p.port_id != params.ingress_port]
 
         expected = {"forward_to_ports": all_other, **spec.expected_result}
-        return self.validator.validate(case, sent_frames, received, expected, duration_ms)
+        return self.validator.validate(mcast_case, sent_frames, received, expected, duration_ms)
 
     async def _test_unknown_unicast(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -239,15 +244,16 @@ class GeneralTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        # Use a MAC the switch has never seen
-        case.parameters.dst_mac = "02:ff:ff:ff:ff:ff"
+        unknown_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"dst_mac": "02:ff:ff:ff:ff:ff"}),
+        })
 
         sent_frames: list[FrameCapture] = []
         received: dict[int, list[FrameCapture]] = {}
 
         if interface is not None:
-            sent_frames = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
+            sent_frames = await interface.send_frame(unknown_case)
+            received = await interface.capture_frames(unknown_case)
         else:
             sent_frames = [FrameCapture(
                 port_id=params.ingress_port, timestamp=time.time(),
@@ -269,7 +275,7 @@ class GeneralTests(BaseTestSpec):
                      if p.port_id != params.ingress_port]
 
         expected = {"forward_to_ports": all_other, **spec.expected_result}
-        return self.validator.validate(case, sent_frames, received, expected, duration_ms)
+        return self.validator.validate(unknown_case, sent_frames, received, expected, duration_ms)
 
     async def _test_minimum_frame_size(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -280,8 +286,10 @@ class GeneralTests(BaseTestSpec):
         Verify the switch correctly forwards minimum-size frames.
         """
         self.log_spec_info(spec)
-        case.parameters.payload_size = 64
-        return await self._test_unicast_forwarding(spec, case, interface)
+        min_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"payload_size": 64}),
+        })
+        return await self._test_unicast_forwarding(spec, min_case, interface)
 
     async def _test_maximum_frame_size(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -292,8 +300,10 @@ class GeneralTests(BaseTestSpec):
         Verify the switch correctly forwards maximum-size frames.
         """
         self.log_spec_info(spec)
-        case.parameters.payload_size = 1518
-        return await self._test_unicast_forwarding(spec, case, interface)
+        max_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"payload_size": 1518}),
+        })
+        return await self._test_unicast_forwarding(spec, max_case, interface)
 
     async def _test_runt_frame_handling(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -305,37 +315,21 @@ class GeneralTests(BaseTestSpec):
         drops or pads the frame (behavior is implementation-specific).
         """
         self.log_spec_info(spec)
-        params = case.parameters
-        t0 = time.perf_counter()
-
-        # Force undersized payload
-        case.parameters.payload_size = 46  # Minimum allowed by Pydantic
-
-        sent_frames: list[FrameCapture] = []
-        received: dict[int, list[FrameCapture]] = {}
-
-        if interface is not None:
-            sent_frames = await interface.send_frame(case)
-            received = await interface.capture_frames(case)
-        else:
-            sent_frames = [FrameCapture(
-                port_id=params.ingress_port, timestamp=time.time(),
-                src_mac=params.src_mac, dst_mac=params.dst_mac,
-                payload_size=46,
-            )]
-
-        duration_ms = (time.perf_counter() - t0) * 1000
-
-        # Runt handling is INFORMATIONAL — behavior varies by implementation
+        # OS network stacks (Scapy included) pad Ethernet frames to 64 bytes.
+        # Actually injecting a sub-64-byte frame requires AF_PACKET with ETH_P_ALL
+        # and explicit manual padding suppression — not available in the current
+        # Scapy send path.  Mark as SKIP with a clear hardware-required note.
         return TestResult(
             case_id=case.case_id,
             spec_id=case.spec_id,
             tc8_reference=case.tc8_reference,
             section=case.section,
-            status=TestStatus.INFORMATIONAL,
-            duration_ms=duration_ms,
-            sent_frames=sent_frames,
-            message="Runt frame behavior is implementation-specific (drop or pad)",
+            status=TestStatus.SKIP,
+            message=(
+                "Runt frame injection requires raw AF_PACKET socket with ETH_P_ALL "
+                "and padding suppression — not supported by the current Scapy send path. "
+                "Run this test with a dedicated hardware traffic generator."
+            ),
         )
 
     async def _test_startup_time(

@@ -44,3 +44,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Generated test output (CI artifacts only)
+test_output.txt

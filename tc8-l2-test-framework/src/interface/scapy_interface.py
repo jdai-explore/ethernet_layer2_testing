@@ -193,8 +193,8 @@ class ScapyInterface(BaseDUTInterface):
         for pid, sniffer in sniffers.items():
             try:
                 sniffer.join()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Sniffer join failed on port %d: %s", pid, exc)
             logger.debug(
                 "Captured %d frames on port %d", len(captures[pid]), pid,
             )
@@ -311,12 +311,14 @@ class ScapyInterface(BaseDUTInterface):
             frame = frame / Dot1Q(vlan=params.vid, prio=pcp)
 
         elif params.frame_type == FrameType.DOUBLE_TAGGED:
-            # Outer S-VLAN TPID on Ether.type, inner C-VLAN TPID on outer Dot1Q.type
-            outer_tpid = 0x88A8
+            # Outer TPID comes from case parameters (e.g. 0x88A8 or 0x9100);
+            # inner TPID, inner VID, and inner PCP are driven from params.custom.
+            outer_tpid = params.tpid
+            inner_tpid = params.custom.get("inner_tpid", 0x8100)
             inner_vid = params.custom.get("inner_vid", params.vid)
             inner_pcp = params.custom.get("inner_pcp", 0)
             frame = Ether(src=params.src_mac, dst=params.dst_mac, type=outer_tpid)
-            frame = frame / Dot1Q(vlan=params.vid, prio=pcp, type=0x8100)
+            frame = frame / Dot1Q(vlan=params.vid, prio=pcp, type=inner_tpid)
             frame = frame / Dot1Q(vlan=inner_vid, prio=inner_pcp)
 
         else:

@@ -117,8 +117,10 @@ class VLANTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        case.parameters.frame_type = FrameType.SINGLE_TAGGED
-        sent, received = await self._send_and_capture(case, interface)
+        tagged_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.SINGLE_TAGGED}),
+        })
+        sent, received = await self._send_and_capture(tagged_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         dut = self.config.dut_profile
@@ -132,7 +134,7 @@ class VLANTests(BaseTestSpec):
             "tag_action": "as_configured",
             **spec.expected_result,
         }
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(tagged_case, sent, received, expected, duration_ms)
 
     async def _test_vlan_non_member_drop(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -183,8 +185,10 @@ class VLANTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        case.parameters.frame_type = FrameType.SINGLE_TAGGED
-        sent, received = await self._send_and_capture(case, interface)
+        tagged_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.SINGLE_TAGGED}),
+        })
+        sent, received = await self._send_and_capture(tagged_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         dut = self.config.dut_profile
@@ -197,7 +201,7 @@ class VLANTests(BaseTestSpec):
             "tag_action": "untagged",
             **spec.expected_result,
         }
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(tagged_case, sent, received, expected, duration_ms)
 
     async def _test_vlan_tag_preservation(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -207,8 +211,10 @@ class VLANTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        case.parameters.frame_type = FrameType.SINGLE_TAGGED
-        sent, received = await self._send_and_capture(case, interface)
+        tagged_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.SINGLE_TAGGED}),
+        })
+        sent, received = await self._send_and_capture(tagged_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         dut = self.config.dut_profile
@@ -223,7 +229,7 @@ class VLANTests(BaseTestSpec):
             "preserve_pcp": True,
             **spec.expected_result,
         }
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(tagged_case, sent, received, expected, duration_ms)
 
     # ── PVID (006-008) ────────────────────────────────────────────────
 
@@ -244,12 +250,16 @@ class VLANTests(BaseTestSpec):
         """SWITCH_VLAN_008 — Priority-tagged frame (VID=0) handling."""
         self.log_spec_info(spec)
         t0 = time.perf_counter()
-        case.parameters.vid = 0
-        case.parameters.frame_type = FrameType.SINGLE_TAGGED
-        sent, received = await self._send_and_capture(case, interface)
+        prio_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={
+                "vid": 0,
+                "frame_type": FrameType.SINGLE_TAGGED,
+            }),
+        })
+        sent, received = await self._send_and_capture(prio_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {**spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(prio_case, sent, received, expected, duration_ms)
 
     # ── Double-Tagged (010, 016-018) ──────────────────────────────────
 
@@ -267,11 +277,13 @@ class VLANTests(BaseTestSpec):
                 message="DUT does not support double tagging",
             )
         t0 = time.perf_counter()
-        case.parameters.frame_type = FrameType.DOUBLE_TAGGED
-        sent, received = await self._send_and_capture(case, interface)
+        dt_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.DOUBLE_TAGGED}),
+        })
+        sent, received = await self._send_and_capture(dt_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {**spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(dt_case, sent, received, expected, duration_ms)
 
     async def _test_double_tagged_s_vlan(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -348,11 +360,13 @@ class VLANTests(BaseTestSpec):
         """SWITCH_VLAN_021 — Reserved VID 4095 handling."""
         self.log_spec_info(spec)
         t0 = time.perf_counter()
-        case.parameters.vid = 4095
-        sent, received = await self._send_and_capture(case, interface)
+        reserved_case = case.model_copy(update={
+            "parameters": case.parameters.model_copy(update={"vid": 4095}),
+        })
+        sent, received = await self._send_and_capture(reserved_case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {"tag_action": "drop", **spec.expected_result}
-        return self.validator.validate(case, sent, received, expected, duration_ms)
+        return self.validator.validate(reserved_case, sent, received, expected, duration_ms)
 
     async def _test_generic_vlan(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any

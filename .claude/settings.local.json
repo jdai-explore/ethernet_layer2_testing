@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del \"Z:\\\\layer2_Ethernet_Testing\\\\ethernet_layer2_testing\\\\tc8-l2-test-framework\\\\test_output.txt\")"
+    ]
+  }
+}

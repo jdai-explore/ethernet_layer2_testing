@@ -87,6 +87,9 @@ class ResultValidator:
             all_received.extend(port_frames)
         result.received_frames = all_received
 
+        # Warn about any expected keys that have no validator — prevents silent pass-through.
+        self._warn_unknown_keys(expected)
+
         # Run validation checks
         checks = [
             self._check_frame_forwarding(test_case, received_frames, expected, result),
@@ -94,6 +97,8 @@ class ResultValidator:
             self._check_no_leakage(test_case, received_frames, expected, result),
             self._check_frame_count(test_case, received_frames, expected, result),
             self._check_drop_action(test_case, received_frames, expected, result),
+            self._check_pcp_preserved(test_case, received_frames, expected, result),
+            self._check_learned_port(test_case, received_frames, expected, result),
         ]
 
         # Overall status: FAIL if any check fails
@@ -251,6 +256,75 @@ class ResultValidator:
                 return TestStatus.FAIL
 
         return TestStatus.PASS
+
+    def _check_pcp_preserved(
+        self,
+        test_case: TestCase,
+        received_frames: dict[int, list[FrameCapture]],
+        expected: dict[str, Any],
+        result: TestResult,
+    ) -> TestStatus:
+        """Verify PCP value is unchanged on received tagged frames."""
+        if not expected.get("pcp_preserved", False):
+            return TestStatus.PASS
+
+        expected_pcp = test_case.parameters.pcp
+        for port_id, frames in received_frames.items():
+            for frame in frames:
+                for tag in (frame.vlan_tags or []):
+                    actual_pcp = tag.get("pcp")
+                    if actual_pcp is not None and actual_pcp != expected_pcp:
+                        result.message += (
+                            f"FAIL: PCP not preserved on port {port_id}: "
+                            f"expected={expected_pcp}, actual={actual_pcp}. "
+                        )
+                        return TestStatus.FAIL
+
+        return TestStatus.PASS
+
+    def _check_learned_port(
+        self,
+        test_case: TestCase,
+        received_frames: dict[int, list[FrameCapture]],
+        expected: dict[str, Any],
+        result: TestResult,
+    ) -> TestStatus:
+        """Verify that a frame arrived on the expected learned port.
+
+        Used by address-learning tests after a learn-then-probe sequence.
+        `expected["learned_port"]` must be in `received_frames`.
+        """
+        learned_port = expected.get("learned_port")
+        if learned_port is None:
+            return TestStatus.PASS
+
+        if learned_port not in received_frames or not received_frames[learned_port]:
+            result.message += (
+                f"FAIL: No frame received on learned port {learned_port}. "
+                f"Ports with traffic: {list(received_frames.keys())}. "
+            )
+            return TestStatus.FAIL
+
+        return TestStatus.PASS
+
+    def _warn_unknown_keys(self, expected: dict[str, Any]) -> None:
+        """Log a warning for any expected key that has no validator.
+
+        This prevents unrecognized keys from silently passing through without
+        any behavioral check, making spec gaps visible in the test log.
+        """
+        known_keys = {
+            "forward_to_ports", "blocked_ports", "tag_action", "expected_vid",
+            "expected_tpid", "expected_frame_count", "strict_forwarding",
+            "pcp_preserved", "learned_port",
+            # Informational keys consumed elsewhere
+            "drop", "forward_to", "as_configured",
+        }
+        for key in expected:
+            if key not in known_keys:
+                logger.warning(
+                    "Expected-result key %r has no validator — result may be incomplete", key
+                )
 
     # ── Statistical validation (for non-deterministic tests) ──────────
 
