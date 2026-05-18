@@ -15,7 +15,7 @@ EXT_PERF_001:
     a dedicated traffic generator.
   priority: high
   timing_tier: tier_b
-  setup_requirement: traffic_generator
+  setup_requirement: tgen
   hardware_requirement_detail: >
     Scapy on a standard PC can typically achieve 10–30 Mbps burst, not true
     100 Mbps line rate. For wire-speed test, use a dedicated traffic generator
@@ -48,7 +48,7 @@ EXT_PERF_002:
     threshold measurement requires a traffic generator.
   priority: high
   timing_tier: tier_b
-  setup_requirement: traffic_generator
+  setup_requirement: tgen
   hardware_requirement_detail: >
     Accurate threshold measurement (±1 Mbps) requires a traffic generator.
     Scapy burst can demonstrate that storm control activates but cannot precisely
@@ -76,7 +76,7 @@ EXT_PERF_003:
     Requires a traffic analyzer with sub-microsecond timestamp resolution.
   priority: medium
   timing_tier: tier_c
-  setup_requirement: traffic_generator
+  setup_requirement: tgen
   hardware_requirement_detail: >
     Requires a dedicated traffic analyzer with hardware timestamps (sub-µs resolution)
     to accurately measure IFG. Standard NIC timestamps have ±1 ms noise —
@@ -105,7 +105,7 @@ EXT_PERF_004:
     1024, 1280, 1518 bytes.
   priority: high
   timing_tier: tier_b
-  setup_requirement: traffic_generator
+  setup_requirement: tgen
   hardware_requirement_detail: >
     RFC 2544 requires a bidirectional traffic generator capable of precise rate
     control and frame loss measurement. Ixia IxNetwork, Spirent TestCenter,
@@ -133,7 +133,7 @@ EXT_PERF_005:
     on an automotive-grade switch.
   priority: medium
   timing_tier: tier_b
-  setup_requirement: traffic_generator
+  setup_requirement: tgen
   hardware_requirement_detail: >
     Requires a traffic generator with hardware timestamp support for accurate
     latency measurement. Standard PC NIC timestamps have ±1 ms noise —

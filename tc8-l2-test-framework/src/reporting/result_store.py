@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, text
 from sqlalchemy.orm import Session
 
 from src.models.test_case import TestSuiteReport
@@ -18,6 +18,41 @@ from src.reporting.db_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Expected columns per table (name → SQLite type string used in ADD COLUMN).
+# SQLAlchemy create_all() creates tables but never ALTERs existing ones, so new
+# columns added to the model after initial deployment must be migrated manually.
+_MIGRATION_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "test_results": [
+        ("expected_json", "TEXT"),
+        ("actual_json", "TEXT"),
+        ("sent_frames_json", "TEXT"),
+        ("received_frames_json", "TEXT"),
+        ("log_entries_json", "TEXT"),
+        ("error_detail", "TEXT"),
+    ],
+    "test_runs": [
+        ("informational", "INTEGER DEFAULT 0"),
+        ("errors", "INTEGER DEFAULT 0"),
+        ("pass_rate", "REAL"),
+    ],
+}
+
+
+def _migrate_schema(engine: Any) -> None:
+    """Add any missing columns to existing SQLite tables without dropping data."""
+    with engine.connect() as conn:
+        for table, columns in _MIGRATION_COLUMNS.items():
+            result = conn.execute(text(f"PRAGMA table_info({table})"))
+            existing = {row[1] for row in result}
+            for col_name, col_type in columns:
+                if col_name not in existing:
+                    try:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                        conn.commit()
+                        logger.info("DB migration: added column %s.%s", table, col_name)
+                    except Exception as exc:
+                        logger.warning("DB migration: could not add %s.%s — %s", table, col_name, exc)
 
 
 class ResultStore:
@@ -39,6 +74,7 @@ class ResultStore:
 
         self._engine = get_engine(database_url)
         create_tables(self._engine)
+        _migrate_schema(self._engine)
 
     def save_report(self, report: TestSuiteReport) -> TestRunRecord:
         """Persist a complete TestSuiteReport to the database."""

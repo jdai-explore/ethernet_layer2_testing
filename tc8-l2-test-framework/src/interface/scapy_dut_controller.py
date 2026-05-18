@@ -44,12 +44,18 @@ class ScapyDUTController:
         """
         Request MAC table clear.
 
-        Physical switches cannot be cleared over raw Ethernet, so we
-        log the request and return True.  The session manager will
-        fall back to aging if needed.
+        ScapyDUTController has no management channel (no DoIP/SSH/JTAG), so it
+        cannot actually clear the MAC table. Returns False to signal that the
+        session manager must fall back to aging or DUT reset.
+        Returning True here would cause the session to claim a clean state it
+        cannot guarantee — a false PASS risk for address-learning tests.
         """
-        logger.info("%s MAC table clear requested — no direct management channel", _TAG)
-        return True
+        logger.warning(
+            "%s MAC table clear NOT performed — no management channel. "
+            "Session state will be marked unclean; address tests may be order-dependent.",
+            _TAG,
+        )
+        return False
 
     async def clear_statistics(self) -> bool:
         """Clear statistics — no direct management channel available."""

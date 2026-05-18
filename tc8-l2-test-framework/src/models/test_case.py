@@ -208,10 +208,10 @@ class TestSpecDefinition(BaseModel):
     expected_result: dict[str, Any] = Field(default_factory=dict)
     timing_tolerance_ms: float = Field(default=100.0)
     applicable_frame_types: list[FrameType] = Field(
-        default_factory=lambda: list(FrameType)
+        default_factory=lambda: [FrameType.UNTAGGED]
     )
     applicable_tpids: list[int] = Field(
-        default_factory=lambda: [0x8100, 0x88A8, 0x9100]
+        default_factory=lambda: [0x8100]
     )
 
     # ── Hardware / setup requirements ─────────────────────────────────

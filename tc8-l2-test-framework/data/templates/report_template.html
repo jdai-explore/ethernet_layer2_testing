@@ -333,6 +333,21 @@
             background: var(--surface-hover);
         }
 
+        /* Expand chevron */
+        .expand-chevron {
+            color: var(--text-dim);
+            font-size: 0.7rem;
+            text-align: center;
+            width: 1.5rem;
+            transition: transform 0.15s ease;
+            user-select: none;
+        }
+
+        tr.row-expanded .expand-chevron {
+            transform: rotate(90deg);
+            color: #60a5fa;
+        }
+
         /* Detail panel */
         .detail-row {
             display: none;
@@ -675,17 +690,19 @@
                     <th>Section</th>
                     <th>Duration</th>
                     <th>Message</th>
+                    <th title="Click row to expand details"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in report.results %}
-                <tr class="clickable result-row" data-status="{{ r.status.value }}" data-case="{{ r.case_id }}">
+                <tr class="clickable result-row" data-status="{{ r.status.value }}" data-case="{{ r.case_id }}" title="Click to expand details">
                     <td><span class="badge {{ r.status.value }}">{{ r.status.value }}</span></td>
                     <td>{{ r.case_id }}</td>
                     <td>{{ r.spec_id }}</td>
                     <td>{{ r.section.value if r.section else '-' }}</td>
                     <td>{{ "%.1f" | format(r.duration_ms) }}ms</td>
                     <td class="message">{{ r.message or '' }}</td>
+                    <td class="expand-chevron" aria-label="Expand details">&#9654;</td>
                 </tr>
                 <!-- Detail panel (initially hidden) -->
                 <tr class="detail-row" id="detail-{{ loop.index }}">
@@ -859,6 +876,7 @@
                 if (detailRow && detailRow.classList.contains('detail-row')) {
                     const isVisible = detailRow.style.display === 'table-row';
                     detailRow.style.display = isVisible ? 'none' : 'table-row';
+                    row.classList.toggle('row-expanded', !isVisible);
                 }
             });
         });

@@ -99,6 +99,8 @@ class VLANTests(BaseTestSpec):
             logger.warning("[%s] Running in 1-port mode. Forwarding cannot be fully verified as there are no egress ports.", spec.spec_id)
 
         member_ports = self._get_member_ports(params.vid, params.ingress_port, dut)
+        if skip := self._skip_if_no_egress_ports(spec.spec_id, params.vid, params.ingress_port, member_ports, case):
+            return skip
         non_member_ports = self._get_non_member_ports(params.vid, params.ingress_port, dut)
 
         expected = {
@@ -117,24 +119,23 @@ class VLANTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        tagged_case = case.model_copy(update={
-            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.SINGLE_TAGGED}),
-        })
-        sent, received = await self._send_and_capture(tagged_case, interface)
+        sent, received = await self._send_and_capture(case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         dut = self.config.dut_profile
         member_ports = self._get_member_ports(params.vid, params.ingress_port, dut)
+        if skip := self._skip_if_no_egress_ports(spec.spec_id, params.vid, params.ingress_port, member_ports, case):
+            return skip
         non_member_ports = self._get_non_member_ports(params.vid, params.ingress_port, dut)
 
         expected = {
             "forward_to_ports": member_ports,
             "blocked_ports": non_member_ports,
             "strict_forwarding": True,
-            "tag_action": "as_configured",
+            "tag_action": "tagged",
             **spec.expected_result,
         }
-        return self.validator.validate(tagged_case, sent, received, expected, duration_ms)
+        return self.validator.validate(case, sent, received, expected, duration_ms)
 
     async def _test_vlan_non_member_drop(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -168,6 +169,8 @@ class VLANTests(BaseTestSpec):
         trunk_ports = [p.port_id for p in (dut.ports if dut else [])
                        if p.is_trunk and p.port_id != params.ingress_port
                        and params.vid in p.vlan_membership]
+        if skip := self._skip_if_no_egress_ports(spec.spec_id, params.vid, params.ingress_port, trunk_ports, case):
+            return skip
 
         expected = {
             "forward_to_ports": trunk_ports,
@@ -185,23 +188,22 @@ class VLANTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        tagged_case = case.model_copy(update={
-            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.SINGLE_TAGGED}),
-        })
-        sent, received = await self._send_and_capture(tagged_case, interface)
+        sent, received = await self._send_and_capture(case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         dut = self.config.dut_profile
         access_ports = [p.port_id for p in (dut.ports if dut else [])
                         if not p.is_trunk and p.port_id != params.ingress_port
                         and params.vid in p.vlan_membership]
+        if skip := self._skip_if_no_egress_ports(spec.spec_id, params.vid, params.ingress_port, access_ports, case):
+            return skip
 
         expected = {
             "forward_to_ports": access_ports,
             "tag_action": "untagged",
             **spec.expected_result,
         }
-        return self.validator.validate(tagged_case, sent, received, expected, duration_ms)
+        return self.validator.validate(case, sent, received, expected, duration_ms)
 
     async def _test_vlan_tag_preservation(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -211,25 +213,25 @@ class VLANTests(BaseTestSpec):
         params = case.parameters
         t0 = time.perf_counter()
 
-        tagged_case = case.model_copy(update={
-            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.SINGLE_TAGGED}),
-        })
-        sent, received = await self._send_and_capture(tagged_case, interface)
+        # Generator creates single_tagged cases for this spec (applicable_frame_types set in YAML)
+        sent, received = await self._send_and_capture(case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
 
         dut = self.config.dut_profile
         trunk_ports = [p.port_id for p in (dut.ports if dut else [])
                        if p.is_trunk and p.port_id != params.ingress_port
                        and params.vid in p.vlan_membership]
+        if skip := self._skip_if_no_egress_ports(spec.spec_id, params.vid, params.ingress_port, trunk_ports, case):
+            return skip
 
         expected = {
             "forward_to_ports": trunk_ports,
             "tag_action": "tagged",
             "expected_vid": params.vid,
-            "preserve_pcp": True,
+            "pcp_preserved": True,
             **spec.expected_result,
         }
-        return self.validator.validate(tagged_case, sent, received, expected, duration_ms)
+        return self.validator.validate(case, sent, received, expected, duration_ms)
 
     # ── PVID (006-008) ────────────────────────────────────────────────
 
@@ -277,13 +279,10 @@ class VLANTests(BaseTestSpec):
                 message="DUT does not support double tagging",
             )
         t0 = time.perf_counter()
-        dt_case = case.model_copy(update={
-            "parameters": case.parameters.model_copy(update={"frame_type": FrameType.DOUBLE_TAGGED}),
-        })
-        sent, received = await self._send_and_capture(dt_case, interface)
+        sent, received = await self._send_and_capture(case, interface)
         duration_ms = (time.perf_counter() - t0) * 1000
         expected = {**spec.expected_result}
-        return self.validator.validate(dt_case, sent, received, expected, duration_ms)
+        return self.validator.validate(case, sent, received, expected, duration_ms)
 
     async def _test_double_tagged_s_vlan(
         self, spec: TestSpecDefinition, case: TestCase, interface: Any
@@ -414,3 +413,25 @@ class VLANTests(BaseTestSpec):
             return []
         return [p.port_id for p in dut.ports
                 if vid not in p.vlan_membership and p.port_id != ingress]
+
+    @staticmethod
+    def _skip_if_no_egress_ports(
+        spec_id: str, vid: int, ingress_port: int, ports: list[int], case: TestCase
+    ) -> TestResult | None:
+        """Return SKIP when no egress ports exist for VID in the DUT profile.
+
+        Prevents false PASS when the forwarding loop has nothing to iterate.
+        """
+        if ports:
+            return None
+        return TestResult(
+            case_id=case.case_id,
+            spec_id=spec_id,
+            status=TestStatus.SKIP,
+            message=(
+                f"SKIP: VLAN {vid} has no egress ports in the DUT profile "
+                f"(ingress port {ingress_port} is the only member, or the VLAN is not configured "
+                "on any additional ports). Add egress ports to the VLAN membership "
+                "in the DUT profile to enable this forwarding test."
+            ),
+        )

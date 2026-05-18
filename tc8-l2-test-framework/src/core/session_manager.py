@@ -138,7 +138,9 @@ class SessionManager:
             logger.info("Session %s ready (%.1fs setup)", session_id, state.cleanup_wait_s)
         else:
             logger.warning(
-                "Session %s setup INCOMPLETE — mac=%s links=%s",
+                "Session %s setup INCOMPLETE — mac_cleared=%s links_up=%s. "
+                "MAC table state may carry over from previous test cases. "
+                "Address-learning test results (SWITCH_ADDR_*) may be order-dependent.",
                 session_id, state.mac_table_cleared, state.links_verified,
             )
 

@@ -99,10 +99,13 @@ class ResultValidator:
             self._check_drop_action(test_case, received_frames, expected, result),
             self._check_pcp_preserved(test_case, received_frames, expected, result),
             self._check_learned_port(test_case, received_frames, expected, result),
+            self._check_address_behavioral(test_case, received_frames, expected, result),
         ]
 
-        # Overall status: FAIL if any check fails
-        if TestStatus.FAIL in checks:
+        # Overall status: first SKIP or FAIL wins; INFORMATIONAL is informative-only.
+        if TestStatus.SKIP in checks:
+            result.status = TestStatus.SKIP
+        elif TestStatus.FAIL in checks:
             result.status = TestStatus.FAIL
         elif TestStatus.INFORMATIONAL in checks:
             result.status = TestStatus.INFORMATIONAL
@@ -123,6 +126,16 @@ class ResultValidator:
         """Verify frames arrive on expected ports and not on others."""
         expected_ports = expected.get("forward_to_ports", [])
         blocked_ports = expected.get("blocked_ports", [])
+
+        # Safety net: strict_forwarding with an empty port list means the DUT profile
+        # has no egress members for this VLAN — iterating an empty list would produce
+        # a false PASS with zero frames received.
+        if not expected_ports and expected.get("strict_forwarding"):
+            result.message += (
+                "SKIP: forward_to_ports is empty with strict_forwarding=True. "
+                "DUT profile likely has no egress ports configured for this VLAN. "
+            )
+            return TestStatus.SKIP
 
         for port_id in expected_ports:
             if port_id not in received_frames or len(received_frames[port_id]) == 0:
@@ -181,6 +194,14 @@ class ResultValidator:
                 elif expected_tag_action == "drop":
                     # Drop-action validation is handled by _check_drop_action
                     pass
+
+                elif expected_tag_action == "as_configured":
+                    # 'as_configured' is ambiguous — the handler must specify 'tagged' or 'untagged'.
+                    result.warnings.append(
+                        "tag_action='as_configured' is not a concrete assertion — "
+                        "update the handler to use 'tagged' or 'untagged' explicitly."
+                    )
+                    return TestStatus.INFORMATIONAL
 
         return TestStatus.PASS
 
@@ -307,6 +328,44 @@ class ResultValidator:
 
         return TestStatus.PASS
 
+    def _check_address_behavioral(
+        self,
+        test_case: TestCase,
+        received_frames: dict[int, list[FrameCapture]],
+        expected: dict[str, Any],
+        result: TestResult,
+    ) -> TestStatus:
+        """Validate TC8 address-learning behavioral assertions.
+
+        Keys handled:
+        - ``no_learning``: frame must be flooded (more than one egress port has traffic).
+        - ``port_migration``: validated via forward_to_ports in _check_frame_forwarding.
+        - ``entry_aged`` / ``entries_flushed``: frame must be flooded (no unicast delivery).
+        """
+        egress_ports_with_traffic = [
+            pid for pid, frames in received_frames.items()
+            if frames and pid != test_case.parameters.ingress_port
+        ]
+
+        if expected.get("no_learning"):
+            # A non-learned frame must be flooded — at least 2 egress ports should see it.
+            if len(egress_ports_with_traffic) < 2:
+                result.message += (
+                    f"FAIL: no_learning expected flood but frame received on only "
+                    f"{egress_ports_with_traffic} port(s). "
+                )
+                return TestStatus.FAIL
+
+        if expected.get("entry_aged") or expected.get("entries_flushed"):
+            if len(egress_ports_with_traffic) < 2:
+                result.message += (
+                    f"FAIL: aged/flushed entry expected flood but frame received on only "
+                    f"{egress_ports_with_traffic} port(s). "
+                )
+                return TestStatus.FAIL
+
+        return TestStatus.PASS
+
     def _warn_unknown_keys(self, expected: dict[str, Any]) -> None:
         """Log a warning for any expected key that has no validator.
 
@@ -314,11 +373,18 @@ class ResultValidator:
         any behavioral check, making spec gaps visible in the test log.
         """
         known_keys = {
-            "forward_to_ports", "blocked_ports", "tag_action", "expected_vid",
-            "expected_tpid", "expected_frame_count", "strict_forwarding",
-            "pcp_preserved", "learned_port",
-            # Informational keys consumed elsewhere
-            "drop", "forward_to", "as_configured",
+            # Frame forwarding
+            "forward_to_ports", "blocked_ports", "strict_forwarding",
+            # VLAN tag checks
+            "tag_action", "expected_vid", "expected_tpid", "pcp_preserved",
+            # Frame count
+            "expected_frame_count",
+            # Address learning behavioral keys (validated by _check_address_behavioral)
+            "learned_port", "port_migration", "no_learning", "entry_aged",
+            "entries_flushed", "per_vlan_learning", "aging_accurate",
+            # High-level forwarding labels consumed by handlers (not by validator)
+            "forward_to", "timing_measurement", "port_up", "port_down",
+            "mac_entries_removed", "inner_tag_preserved",
         }
         for key in expected:
             if key not in known_keys:

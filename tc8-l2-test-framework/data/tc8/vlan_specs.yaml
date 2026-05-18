@@ -6,6 +6,8 @@ SWITCH_VLAN_001:
   title: "VLAN Membership — Tagged Frame Forwarding"
   description: "Verify tagged frames are forwarded only to ports that are members of the specified VLAN"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
     frame_types: [single_tagged]
@@ -57,6 +59,8 @@ SWITCH_VLAN_004:
   title: "VLAN Tag Removal on Egress"
   description: "Verify switch removes VLAN tag on egress for access ports"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
   test_procedure:
@@ -70,6 +74,8 @@ SWITCH_VLAN_005:
   title: "VLAN Tag Preservation"
   description: "Verify switch preserves VLAN tag (VID, PCP, DEI) on trunk-to-trunk forwarding"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
     pcp_values: [0, 1, 2, 3, 4, 5, 6, 7]
@@ -78,7 +84,7 @@ SWITCH_VLAN_005:
     - "Verify tag preserved on trunk egress"
   expected_result:
     tag_action: "tagged"
-    preserve_pcp: true
+    pcp_preserved: true
 
 SWITCH_VLAN_006:
   tc8_reference: "5.3.6"
@@ -99,6 +105,8 @@ SWITCH_VLAN_007:
   title: "VLAN Filtering — Non-Member Drop"
   description: "Verify frames with VID for which the ingress port is not a member are dropped"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
   test_procedure:
@@ -112,6 +120,8 @@ SWITCH_VLAN_008:
   title: "VLAN ID 0 — Priority Tagged"
   description: "Verify priority-tagged frames (VID=0) are handled per specification"
   priority: medium
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [0, 0]
     pcp_values: [0, 1, 2, 3, 4, 5, 6, 7]
@@ -126,6 +136,8 @@ SWITCH_VLAN_009:
   title: "VLAN ID 4095 — Reserved"
   description: "Verify frames with reserved VID 4095 are dropped"
   priority: medium
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [4095, 4095]
   test_procedure:
@@ -139,6 +151,8 @@ SWITCH_VLAN_010:
   title: "Double-Tagged Frame Handling (802.1ad)"
   description: "Verify switch correctly handles double-tagged Q-in-Q frames"
   priority: medium
+  applicable_frame_types: [double_tagged]
+  applicable_tpids: [0x88A8]
   parameters:
     outer_vid_range: [1, 4094]
     inner_vid_range: [1, 4094]
@@ -159,6 +173,8 @@ SWITCH_VLAN_011:
   title: "VLAN Membership — All Ports Verification"
   description: "Verify VLAN membership forwarding across all DUT ports simultaneously"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
   test_procedure:
@@ -188,6 +204,8 @@ SWITCH_VLAN_013:
   title: "Trunk-to-Access Tag Removal"
   description: "Verify tag is removed when forwarding from trunk to access port"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
   test_procedure:
@@ -228,6 +246,8 @@ SWITCH_VLAN_016:
   title: "Double-Tagged — S-VLAN Forwarding"
   description: "Verify forwarding based on outer S-VLAN for Q-in-Q frames"
   priority: medium
+  applicable_frame_types: [double_tagged]
+  applicable_tpids: [0x88A8]
   parameters:
     outer_vid_range: [1, 4094]
     inner_vid_range: [1, 4094]
@@ -245,6 +265,8 @@ SWITCH_VLAN_017:
   title: "Double-Tagged — C-VLAN Preservation"
   description: "Verify inner C-VLAN tag is preserved during Q-in-Q forwarding"
   priority: medium
+  applicable_frame_types: [double_tagged]
+  applicable_tpids: [0x88A8]
   parameters:
     outer_vid_range: [1, 4094]
     inner_vid_range: [1, 4094]
@@ -260,6 +282,8 @@ SWITCH_VLAN_018:
   title: "Double-Tagged — Outer Tag Strip"
   description: "Verify outer S-VLAN tag stripping on access egress"
   priority: medium
+  applicable_frame_types: [double_tagged]
+  applicable_tpids: [0x88A8]
   parameters:
     frame_types: [double_tagged]
   test_procedure:
@@ -273,6 +297,8 @@ SWITCH_VLAN_019:
   title: "Ingress VLAN Filtering"
   description: "Verify ingress filtering drops frames with VID not in port membership"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
   test_procedure:
@@ -286,6 +312,8 @@ SWITCH_VLAN_020:
   title: "Egress VLAN Filtering"
   description: "Verify egress filtering prevents forwarding to non-member egress ports"
   priority: high
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [1, 4095]
   test_procedure:
@@ -300,6 +328,8 @@ SWITCH_VLAN_021:
   title: "Reserved VID 4095 Handling"
   description: "Verify frames with reserved VID 4095 are dropped per IEEE 802.1Q"
   priority: medium
+  applicable_frame_types: [single_tagged]
+  applicable_tpids: [0x8100]
   parameters:
     vid_range: [4095, 4095]
   test_procedure:
